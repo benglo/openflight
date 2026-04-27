@@ -123,10 +123,19 @@
   --shadow-glow: 0 0 20px var(--color-gold-glow);
   --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.4);
 
-  /* Transitions */
+  /*
+   * Transitions / easing.
+   *
+   * No bounce/elastic curves — they read as "playful toy" rather
+   * than "precision instrument." For things that should feel like
+   * they decelerate naturally (a needle settling, a value landing)
+   * we use ease-out-quint, which is exponential ease-out. Real
+   * objects decelerate this way; bouncy curves do not.
+   */
   --transition-fast: 0.15s ease;
   --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-spring: 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition-spring: 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quint: cubic-bezier(0.16, 1, 0.3, 1);
 
   /* Base styles */
   line-height: 1.4;

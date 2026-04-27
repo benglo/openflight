@@ -122,7 +122,6 @@
 .stat-card--primary .stat-card__value {
   font-size: var(--text-display-stat-primary);
   color: var(--color-gold);
-  text-shadow: 0 0 20px var(--color-gold-glow);
 }
 
 /* Held at the 12px legibility floor. */

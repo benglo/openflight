@@ -93,7 +93,7 @@
    here — the animation is short (0.8s, runs once per shot) and not
    worth holding a permanent compositor layer for. */
 .shot-display--animate .speed-gauge__value-arc {
-  animation: gauge-fill 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  animation: gauge-fill 0.8s var(--ease-out-quint) forwards;
   stroke-dashoffset: 1000;
 }
 
@@ -114,19 +114,23 @@
   align-items: center;
 }
 
-/* Hero readout — the one true primary number on this screen. */
+/* Hero readout — the one true primary number on this screen. We keep
+   a tight 6px halo on the gauge value (and only here) — it's the one
+   moment of "instrument luminescence" we afford. The wider 30px halo
+   we used before bled the digits into the background and hurt
+   legibility at distance on the kiosk. */
 .speed-gauge__value {
   font-family: var(--font-display);
   font-size: var(--text-display-hero);
   font-weight: 400;
   color: var(--color-gold);
   line-height: 1;
-  text-shadow: 0 0 30px var(--color-gold-glow);
+  text-shadow: 0 0 6px var(--color-gold-glow);
 }
 
 /* Animated: value pops in */
 .shot-display--animate .speed-gauge__value {
-  animation: value-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both;
+  animation: value-pop 0.4s var(--ease-out-quint) 0.2s both;
 }
 
 @keyframes value-pop {
@@ -190,7 +194,6 @@
 
 .metric-card--spin .metric-card__value {
   color: var(--color-spin-bright);
-  text-shadow: 0 0 15px var(--color-spin-glow);
 }
 
 .metric-card__value-row {
@@ -214,18 +217,18 @@
 
 /* Animated: metric value pops in */
 .shot-display--animate .metric-card__value {
-  animation: value-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both;
+  animation: value-pop 0.4s var(--ease-out-quint) 0.3s both;
 }
 
 /*
  * Primary cards (carry, sim carry) — the "answer" numbers. One step
  * below the hero gauge, one step above the supporting metrics. Color
- * + size + glow combine to make these read as "the result."
+ * + size do the work; we don't add a halo here, since glow on smaller
+ * digits dilutes legibility more than it adds emphasis.
  */
 .metric-card--primary .metric-card__value {
   font-size: var(--text-display-primary);
   color: var(--color-gold);
-  text-shadow: 0 0 20px var(--color-gold-glow);
 }
 
 .metric-card--secondary .metric-card__value {
