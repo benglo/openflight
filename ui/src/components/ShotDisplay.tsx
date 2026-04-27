@@ -3,7 +3,27 @@ import type { Shot } from '../types/shot';
 import type { SimResult } from '../hooks/useSocket';
 import { useUnitPreference } from '../state/useUnitPreference';
 import { formatCarryRange, formatDistance, formatSpeed, getDistanceUnit, getSpeedUnit } from '../utils/units';
+import { EditableDashboard } from './EditableDashboard';
+import { DashboardKey } from '../hooks/useDashboardLayouts';
 import './ShotDisplay.css';
+
+// Stable card ids for the editable dashboard. Order doesn't drive
+// placement (the layout does), but the set must match exactly the
+// MetricCards rendered below.
+const LIVE_CARD_IDS = [
+  'carry',
+  'club_speed',
+  'v_launch',
+  'club_aoa',
+  'club_path',
+  'spin_axis',
+  'h_launch',
+  'spin_rpm',
+  'sim_carry',
+  'sim_total',
+  'sim_lateral',
+  'sim_apex',
+] as const;
 
 interface ShotDisplayProps {
   shot: Shot | null;
@@ -202,15 +222,25 @@ export function ShotDisplay({ shot, animate = false, simResult = null }: ShotDis
         </div>
 
         {/*
-         * Every metric card always renders. Cards backed by data that
-         * isn't always present (Club AoA from K-LD7, sim cards from
-         * OpenGolfSim) show "—" when their value is missing rather than
-         * disappearing — that keeps the dashboard layout stable across
-         * shots and gives the editable-dashboard work stable card ids
-         * to bind to.
+         * Every metric card always renders with stable id (the `key`
+         * prop) so the editable dashboard has a constant set to bind
+         * its layout to. Cards backed by data that isn't always
+         * present (Club AoA from K-LD7, sim cards from OpenGolfSim)
+         * show "—" when their value is missing rather than
+         * disappearing.
+         *
+         * The EditableDashboard wrapper renders a plain CSS grid
+         * (today's look) when edit mode is off, and react-grid-layout
+         * when edit mode is on. Users see no visual difference until
+         * they hit the edit toggle in the header.
          */}
-        <div className="shot-display__metrics">
+        <EditableDashboard
+          view={DashboardKey.Live}
+          cardIds={LIVE_CARD_IDS}
+          className="shot-display__metrics"
+        >
           <MetricCard
+            key="carry"
             value={formatDistance(displayCarry, unitSystem, 0)}
             unit={getDistanceUnit(unitSystem)}
             label="Est. Carry"
@@ -218,6 +248,7 @@ export function ShotDisplay({ shot, animate = false, simResult = null }: ShotDis
             variant="primary"
           />
           <MetricCard
+            key="club_speed"
             value={shot.club_speed_mph ? formatSpeed(shot.club_speed_mph, unitSystem, 1) : '—'}
             unit={shot.club_speed_mph ? getSpeedUnit(unitSystem) : undefined}
             label="Club Speed"
@@ -225,6 +256,7 @@ export function ShotDisplay({ shot, animate = false, simResult = null }: ShotDis
             variant="secondary"
           />
           <MetricCard
+            key="v_launch"
             value={hasLaunchAngle ? shot.launch_angle_vertical!.toFixed(1) : '—'}
             unit={hasLaunchAngle ? '°' : undefined}
             label="V. Launch"
@@ -233,6 +265,7 @@ export function ShotDisplay({ shot, animate = false, simResult = null }: ShotDis
             confidence={hasLaunchAngle ? getLaunchAngleQuality(shot.launch_angle_confidence) : null}
           />
           <MetricCard
+            key="club_aoa"
             value={shot.club_angle_deg !== null ? shot.club_angle_deg.toFixed(1) : '—'}
             unit={shot.club_angle_deg !== null ? '°' : undefined}
             label="Club AoA"
@@ -240,6 +273,7 @@ export function ShotDisplay({ shot, animate = false, simResult = null }: ShotDis
             variant="secondary"
           />
           <MetricCard
+            key="club_path"
             value={
               shot.club_path_deg !== null
                 ? (shot.club_path_deg >= 0 ? '+' : '') + shot.club_path_deg.toFixed(1)
@@ -251,6 +285,7 @@ export function ShotDisplay({ shot, animate = false, simResult = null }: ShotDis
             variant="secondary"
           />
           <MetricCard
+            key="spin_axis"
             value={
               shot.spin_axis_deg !== null
                 ? (shot.spin_axis_deg >= 0 ? '+' : '') + shot.spin_axis_deg.toFixed(1)
@@ -270,6 +305,7 @@ export function ShotDisplay({ shot, animate = false, simResult = null }: ShotDis
             variant="secondary"
           />
           <MetricCard
+            key="h_launch"
             value={
               shot.launch_angle_horizontal !== null
                 ? (shot.launch_angle_horizontal >= 0 ? '+' : '') +
@@ -287,6 +323,7 @@ export function ShotDisplay({ shot, animate = false, simResult = null }: ShotDis
             }
           />
           <MetricCard
+            key="spin_rpm"
             value={hasSpin ? formatSpinRpm(shot.spin_rpm!) : '—'}
             unit={hasSpin ? 'rpm' : undefined}
             label="Spin Rate"
@@ -294,6 +331,7 @@ export function ShotDisplay({ shot, animate = false, simResult = null }: ShotDis
             confidence={hasSpin ? shot.spin_quality : null}
           />
           <MetricCard
+            key="sim_carry"
             value={simResult ? formatDistance(simResult.carry_yards, unitSystem, 0) : '—'}
             unit={simResult ? getDistanceUnit(unitSystem) : undefined}
             label="Sim Carry"
@@ -301,6 +339,7 @@ export function ShotDisplay({ shot, animate = false, simResult = null }: ShotDis
             variant="primary"
           />
           <MetricCard
+            key="sim_total"
             value={simResult ? formatDistance(simResult.total_yards, unitSystem, 0) : '—'}
             unit={simResult ? getDistanceUnit(unitSystem) : undefined}
             label="Sim Total"
@@ -312,6 +351,7 @@ export function ShotDisplay({ shot, animate = false, simResult = null }: ShotDis
             variant="secondary"
           />
           <MetricCard
+            key="sim_lateral"
             value={
               simResult
                 ? (simResult.lateral_yards >= 0 ? '+' : '') +
@@ -332,12 +372,13 @@ export function ShotDisplay({ shot, animate = false, simResult = null }: ShotDis
             variant="secondary"
           />
           <MetricCard
+            key="sim_apex"
             value={simResult ? formatDistance(simResult.max_height_yards, unitSystem, 0) : '—'}
             unit={simResult ? getDistanceUnit(unitSystem) : undefined}
             label="Sim Apex"
             variant="secondary"
           />
-        </div>
+        </EditableDashboard>
       </div>
     </section>
   );

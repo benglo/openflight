@@ -64,7 +64,15 @@ export function EditableDashboard({
   className,
 }: EditableDashboardProps) {
   const { editMode } = useEditMode();
-  const { layouts, setLayouts } = useDashboardLayouts(view, cardIds);
+  const { layouts, setLayouts, reset } = useDashboardLayouts(view, cardIds);
+
+  const handleReset = useCallback(() => {
+    if (typeof window !== 'undefined' && window.confirm) {
+      const confirmed = window.confirm('Reset this dashboard layout to defaults?');
+      if (!confirmed) return;
+    }
+    reset();
+  }, [reset]);
 
   // Filter children to only those whose key is in cardIds. Defensive —
   // protects against a child being rendered without a corresponding
@@ -121,6 +129,14 @@ export function EditableDashboard({
           </div>
         ))}
       </ResponsiveGridLayout>
+      <button
+        type="button"
+        className="editable-dashboard__reset"
+        onClick={handleReset}
+        aria-label="Reset dashboard layout to defaults"
+      >
+        Reset Layout
+      </button>
     </div>
   );
 }

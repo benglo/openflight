@@ -61,6 +61,39 @@
 }
 
 /*
+ * Reset Layout button — shown only in edit mode, lives at the bottom
+ * of the editable region. Confirmation handled in JS, so the button
+ * itself stays simple.
+ */
+.editable-dashboard__reset {
+  margin-top: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: transparent;
+  border: 1px dashed var(--color-danger-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-danger);
+  font-family: var(--font-body);
+  font-size: var(--text-label-small);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  align-self: flex-start;
+  min-height: 44px;
+  touch-action: manipulation;
+}
+
+.editable-dashboard__reset:hover {
+  background: var(--color-danger-bg);
+  border-style: solid;
+}
+
+.editable-dashboard__reset:active {
+  transform: scale(0.97);
+}
+
+/*
  * Reduced motion — disable the drag/resize animation so the layout
  * snaps rather than smoothly translates. Users with vestibular needs
  * still get a usable edit mode, just without the smoothing.
