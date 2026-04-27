@@ -520,3 +520,64 @@ class TestOnShotDetected:
 
         assert shot.angle_source == "radar"
         assert shot.launch_angle_vertical == pytest.approx(18.7)
+
+
+class TestOpenGolfSimForwarding:
+    """Tests that opt-in OpenGolfSim forwarding is wired into the shot pipeline."""
+
+    def test_shot_forwarded_to_opengolfsim_when_enabled(self, monkeypatch):
+        sent = []
+
+        class StubClient:
+            def send_shot(self, shot, *, unit="imperial"):
+                sent.append((shot, unit))
+                return True
+
+        monkeypatch.setattr(server_module.state, "opengolfsim", StubClient())
+        monkeypatch.setattr(server_module.state, "kld7_vertical", None)
+        monkeypatch.setattr(server_module.state, "kld7_horizontal", None)
+        monkeypatch.setattr(server_module.state, "camera_tracker", None)
+        monkeypatch.setattr(server_module.state, "camera_enabled", False)
+        monkeypatch.setattr(server_module.state, "monitor", None)
+        monkeypatch.setattr(server_module.state, "debug_mode", False)
+        monkeypatch.setattr(server_module, "get_session_logger", lambda: None)
+        monkeypatch.setattr(server_module.socketio, "emit", lambda *a, **kw: None)
+
+        shot = Shot(
+            ball_speed_mph=145.0,
+            timestamp=datetime.now(),
+            club=ClubType.DRIVER,
+            launch_angle_vertical=12.0,
+            launch_angle_horizontal=0.0,
+            spin_rpm=2500,
+            spin_axis_deg=0.0,
+        )
+        on_shot_detected(shot)
+
+        assert len(sent) == 1
+        assert sent[0][0].ball_speed_mph == 145.0
+        assert sent[0][1] == "imperial"
+
+    def test_shot_not_forwarded_when_disabled(self, monkeypatch):
+        """state.opengolfsim is None by default → no forwarding, no error."""
+        monkeypatch.setattr(server_module.state, "opengolfsim", None)
+        monkeypatch.setattr(server_module.state, "kld7_vertical", None)
+        monkeypatch.setattr(server_module.state, "kld7_horizontal", None)
+        monkeypatch.setattr(server_module.state, "camera_tracker", None)
+        monkeypatch.setattr(server_module.state, "camera_enabled", False)
+        monkeypatch.setattr(server_module.state, "monitor", None)
+        monkeypatch.setattr(server_module.state, "debug_mode", False)
+        monkeypatch.setattr(server_module, "get_session_logger", lambda: None)
+        monkeypatch.setattr(server_module.socketio, "emit", lambda *a, **kw: None)
+
+        shot = Shot(
+            ball_speed_mph=130.0,
+            timestamp=datetime.now(),
+            club=ClubType.IRON_7,
+            launch_angle_vertical=18.0,
+            launch_angle_horizontal=0.0,
+            spin_rpm=6000,
+            spin_axis_deg=0.0,
+        )
+        # Must not raise.
+        on_shot_detected(shot)

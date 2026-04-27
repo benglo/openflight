@@ -88,6 +88,9 @@ class AppState:  # pylint: disable=too-few-public-methods
         # Radar configuration (mutated via socket events)
         self.radar_config: dict = {}
 
+        # OpenGolfSim integration (None when --opengolfsim is not set)
+        self.opengolfsim = None
+
 
 state = AppState()
 
@@ -1159,6 +1162,12 @@ def on_shot_detected(shot: Shot):
     except Exception as e:
         logger.warning("[SERVER] Failed to log shot: %s", e, exc_info=True)
 
+    # Forward to OpenGolfSim if enabled. Do this before the UI emit so a
+    # slow simulator doesn't delay the user-visible shot card; client.send_shot
+    # only enqueues, never blocks on I/O.
+    if state.opengolfsim is not None:
+        state.opengolfsim.send_shot(shot)
+
     # Emit shot with launch angle data included
     try:
         shot_data = shot_to_dict(shot)
@@ -1515,6 +1524,22 @@ def main():
         "--show-raw", action="store_true", help="Show raw radar readings in console (signed values)"
     )
     parser.add_argument(
+        "--opengolfsim",
+        action="store_true",
+        help="Forward shots to a running OpenGolfSim over TCP",
+    )
+    parser.add_argument(
+        "--opengolfsim-host",
+        default="127.0.0.1",
+        help="OpenGolfSim host (default: 127.0.0.1)",
+    )
+    parser.add_argument(
+        "--opengolfsim-port",
+        type=int,
+        default=3111,
+        help="OpenGolfSim TCP port (default: 3111)",
+    )
+    parser.add_argument(
         "--no-camera", action="store_true", help="Disable camera (auto-enabled if available)"
     )
     parser.add_argument(
@@ -1710,6 +1735,40 @@ def main():
         sample_rate_ksps=args.sample_rate,
     )
 
+    if args.opengolfsim:
+        from .opengolfsim import OpenGolfSimClient  # pylint: disable=import-outside-toplevel
+
+        def _on_ogs_player_update(data: dict) -> None:
+            club_obj = (data or {}).get("club") or {}
+            club_id = club_obj.get("id")
+            if not club_id:
+                return
+            try:
+                club = ClubType(club_id.lower())
+            except ValueError:
+                logger.warning(
+                    "[OPENGOLFSIM] Unknown club id %r — keeping current selection", club_id,
+                )
+                return
+            if state.monitor:
+                state.monitor.set_club(club)
+            socketio.emit("club_changed", {"club": club.value})
+
+        def _on_ogs_result(data: dict) -> None:
+            socketio.emit("opengolfsim_result", data or {})
+
+        state.opengolfsim = OpenGolfSimClient(
+            host=args.opengolfsim_host,
+            port=args.opengolfsim_port,
+            on_player_update=_on_ogs_player_update,
+            on_result=_on_ogs_result,
+        )
+        state.opengolfsim.start()
+        logger.info(
+            "[SERVER] OpenGolfSim integration enabled (%s:%d)",
+            args.opengolfsim_host, args.opengolfsim_port,
+        )
+
     if args.mock:
         print("Running in MOCK mode - no radar required")
         print("Simulate shots via WebSocket or API")
@@ -1724,6 +1783,8 @@ def main():
             app, host=args.host, port=args.web_port, debug=False, allow_unsafe_werkzeug=True
         )
     finally:
+        if state.opengolfsim is not None:
+            state.opengolfsim.stop()
         if state.kld7_vertical:
             state.kld7_vertical.stop()
         if state.kld7_horizontal:
