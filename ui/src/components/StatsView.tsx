@@ -3,12 +3,24 @@ import { useUnitPreference } from '../state/useUnitPreference';
 import type { Shot } from '../types/shot';
 import { computeStats, getUniqueClubs } from '../types/shot';
 import { formatDistance, formatSpeed, getDistanceUnit, getSpeedUnit } from '../utils/units';
+import { EditableDashboard } from './EditableDashboard';
+import { DashboardKey } from '../hooks/useDashboardLayouts';
 import './StatsView.css';
 
 interface StatsViewProps {
   shots: Shot[];
   onClearSession: () => void;
 }
+
+// Stable card ids matching the hook's default Stats layout.
+const STATS_CARD_IDS = [
+  'avg_carry',
+  'shots',
+  'avg_ball',
+  'max_ball',
+  'avg_club',
+  'avg_smash',
+] as const;
 
 export function StatsView({ shots, onClearSession }: StatsViewProps) {
   const [selectedClub, setSelectedClub] = useState<string | null>(null);
@@ -79,46 +91,57 @@ export function StatsView({ shots, onClearSession }: StatsViewProps) {
       </div>
 
       {/*
-       * Description-list for the stats grid: each card is a (term, value)
-       * pair. Screen readers announce these as definitions, which matches
-       * the user's mental model ("Avg Carry: 240 yards") far better than
-       * a div soup of spans.
+       * Stats cards. We use plain divs (not <dl>/<dt>/<dd>) here because
+       * the EditableDashboard wraps each child in a positioned div for
+       * react-grid-layout, which would break the description-list
+       * association. The section's aria-labelledby + h2 gives screen
+       * readers a structured "Session Stats" announcement and each card
+       * has a label-then-value pair that's still readable in document
+       * order.
        *
        * Avg Carry is the single hero — it spans the full row at the top
        * because it's the answer most golfers care about. Avg Ball was
        * previously also marked --primary but two primaries is no primary;
        * it's now part of the supporting strip below.
+       *
+       * Cards always render even when their value is missing (Avg Club,
+       * Avg Smash) — show "—" so the editable dashboard has stable card
+       * ids to bind layouts to.
        */}
-      <dl className="stats-grid">
-        <div className="stat-card stat-card--primary">
-          <dt className="stat-card__label">Avg Carry ({distanceUnit})</dt>
-          <dd className="stat-card__value">{formatDistance(stats.avg_carry_est, unitSystem, 0)}</dd>
+      <EditableDashboard
+        view={DashboardKey.Stats}
+        cardIds={STATS_CARD_IDS}
+        className="stats-grid"
+      >
+        <div key="avg_carry" className="stat-card stat-card--primary">
+          <span className="stat-card__label">Avg Carry ({distanceUnit})</span>
+          <span className="stat-card__value">{formatDistance(stats.avg_carry_est, unitSystem, 0)}</span>
         </div>
-        <div className="stat-card">
-          <dt className="stat-card__label">Shots</dt>
-          <dd className="stat-card__value">{stats.shot_count}</dd>
+        <div key="shots" className="stat-card">
+          <span className="stat-card__label">Shots</span>
+          <span className="stat-card__value">{stats.shot_count}</span>
         </div>
-        <div className="stat-card">
-          <dt className="stat-card__label">Avg Ball ({speedUnit})</dt>
-          <dd className="stat-card__value">{formatSpeed(stats.avg_ball_speed, unitSystem, 1)}</dd>
+        <div key="avg_ball" className="stat-card">
+          <span className="stat-card__label">Avg Ball ({speedUnit})</span>
+          <span className="stat-card__value">{formatSpeed(stats.avg_ball_speed, unitSystem, 1)}</span>
         </div>
-        <div className="stat-card">
-          <dt className="stat-card__label">Max Ball ({speedUnit})</dt>
-          <dd className="stat-card__value">{formatSpeed(stats.max_ball_speed, unitSystem, 1)}</dd>
+        <div key="max_ball" className="stat-card">
+          <span className="stat-card__label">Max Ball ({speedUnit})</span>
+          <span className="stat-card__value">{formatSpeed(stats.max_ball_speed, unitSystem, 1)}</span>
         </div>
-        {stats.avg_club_speed && (
-          <div className="stat-card">
-            <dt className="stat-card__label">Avg Club ({speedUnit})</dt>
-            <dd className="stat-card__value">{formatSpeed(stats.avg_club_speed, unitSystem, 1)}</dd>
-          </div>
-        )}
-        {stats.avg_smash_factor && (
-          <div className="stat-card">
-            <dt className="stat-card__label">Avg Smash</dt>
-            <dd className="stat-card__value">{stats.avg_smash_factor.toFixed(2)}</dd>
-          </div>
-        )}
-      </dl>
+        <div key="avg_club" className="stat-card">
+          <span className="stat-card__label">Avg Club ({speedUnit})</span>
+          <span className="stat-card__value">
+            {stats.avg_club_speed ? formatSpeed(stats.avg_club_speed, unitSystem, 1) : '—'}
+          </span>
+        </div>
+        <div key="avg_smash" className="stat-card">
+          <span className="stat-card__label">Avg Smash</span>
+          <span className="stat-card__value">
+            {stats.avg_smash_factor ? stats.avg_smash_factor.toFixed(2) : '—'}
+          </span>
+        </div>
+      </EditableDashboard>
 
       <button type="button" className="clear-button" onClick={onClearSession}>
         Clear Session

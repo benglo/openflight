@@ -211,6 +211,7 @@ uv run pytest tests/ -v
 - **[K-LD7 Session Review](docs/kld7-session-review.md)** — Offline review workflow for session JSONL files
 - **[Replay Framework](docs/replay-framework.md)** — Regression / A-B testing harness for offline signal-processing iteration
 - **[OpenGolfSim Integration](docs/opengolfsim-integration.md)** — Forward shots to OpenGolfSim over TCP and surface its results
+- **[Editable Dashboard](docs/editable-dashboard.md)** — Drag-and-drop widget arrangement on the Live and Stats screens
 - **[Observability & Log Shipping](docs/observability.md)** — Ship logs to Grafana Cloud
 - **[Contributing Guide](CONTRIBUTING.md)** — How to contribute
 - **[Changelog](docs/CHANGELOG.md)** — Version history
