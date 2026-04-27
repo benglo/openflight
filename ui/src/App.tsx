@@ -17,8 +17,11 @@ import {
 } from './components/LaunchDaddy';
 import { ShotProvider } from './state/ShotProvider';
 import { UnitPreferenceProvider } from './state/UnitPreferenceProvider';
+import { EditModeProvider } from './state/EditModeProvider';
 import { useShotContext } from './state/useShotContext';
 import { useUnitPreference } from './state/useUnitPreference';
+
+import { EditModeToggle } from './components/EditModeToggle';
 
 import Logo from './logo/Logo';
 
@@ -164,6 +167,7 @@ function AppContent() {
             confidence={cameraStatus.ball_confidence}
             onToggle={toggleCamera}
           />
+          <EditModeToggle />
           <ConnectionStatus connected={connected} />
           <button
             className="power-button"
@@ -280,9 +284,11 @@ function App() {
   return (
     <LaunchDaddyProvider>
       <UnitPreferenceProvider>
-        <ShotProvider>
-          <AppContent />
-        </ShotProvider>
+        <EditModeProvider>
+          <ShotProvider>
+            <AppContent />
+          </ShotProvider>
+        </EditModeProvider>
       </UnitPreferenceProvider>
     </LaunchDaddyProvider>
   );

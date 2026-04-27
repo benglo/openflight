@@ -12,20 +12,24 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Layout } from 'react-grid-layout';
+import type { LayoutItem } from 'react-grid-layout';
 
 export const SCHEMA_VERSION = 1;
 const STORAGE_KEY = 'openflight.dashboard.v1';
 
-export enum DashboardKey {
-  Live = 'live',
-  Stats = 'stats',
-}
+// `erasableSyntaxOnly` is enabled in tsconfig, so we use a const object
+// + a string-literal type rather than an enum. Same ergonomics, no
+// runtime side-effects.
+export const DashboardKey = {
+  Live: 'live',
+  Stats: 'stats',
+} as const;
+export type DashboardKey = (typeof DashboardKey)[keyof typeof DashboardKey];
 
 export interface DashboardLayouts {
-  kiosk: Layout[];
-  tablet: Layout[];
-  phone: Layout[];
+  kiosk: LayoutItem[];
+  tablet: LayoutItem[];
+  phone: LayoutItem[];
 }
 
 interface StoredShape {
@@ -148,7 +152,7 @@ function writeStored(view: DashboardKey, layouts: DashboardLayouts) {
 
 // --- Reconciliation ---
 
-function reconcileBreakpoint(items: Layout[], knownIds: readonly string[]): Layout[] {
+function reconcileBreakpoint(items: LayoutItem[], knownIds: readonly string[]): LayoutItem[] {
   const known = new Set(knownIds);
   const present = new Set<string>();
   const filtered = items.filter((it) => {
