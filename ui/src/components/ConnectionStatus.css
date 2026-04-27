@@ -67,11 +67,38 @@
 @media (max-height: 500px) {
   .connection-status {
     padding: 2px var(--space-xs);
-    font-size: 0.5625rem;
+    font-size: var(--text-caption);
   }
 
   .connection-status__dot {
     width: 5px;
     height: 5px;
+  }
+}
+
+/*
+ * Narrow viewports (phone portrait): collapse to dot-only so the
+ * pill doesn't push the header into overflow. The dot already
+ * communicates state via color and animation; the text was
+ * redundant context.
+ */
+@media (max-width: 600px) {
+  .connection-status__text {
+    /* visually-hidden — keep the label for screen readers */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .connection-status {
+    padding: var(--space-xs);
+    aspect-ratio: 1;
+    border-radius: 50%;
   }
 }

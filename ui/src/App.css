@@ -72,17 +72,39 @@
   color: var(--color-gold);
 }
 
-/* Navigation */
+/*
+ * Navigation — horizontally swipe-scrollable on narrow viewports, so
+ * the menu never crams all 5 buttons into too little space. On the
+ * kiosk and any wide viewport everything fits in a single flush row
+ * (flex: 1 shares the width); on a phone the buttons keep their
+ * minimum width and overflow horizontally with momentum scrolling.
+ *
+ * The scrollbar is hidden visually but the area is still keyboard- and
+ * touch-scrollable. Touch targets stay at 44px (WCAG 2.5.5).
+ */
 .nav {
   display: flex;
   gap: var(--space-sm);
   padding: var(--space-sm) var(--space-lg);
   background: var(--color-bg-card);
   flex-shrink: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none; /* Firefox */
+}
+
+.nav::-webkit-scrollbar {
+  display: none; /* Safari, Chrome */
 }
 
 .nav__button {
-  flex: 1;
+  /*
+   * `flex: 1 0 auto` so buttons share width when they fit, but never
+   * shrink below their content. On narrow viewports they keep
+   * comfortable size and the overflow scrolls horizontally.
+   */
+  flex: 1 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -101,6 +123,7 @@
   min-height: 42px;
   position: relative;
   overflow: hidden;
+  white-space: nowrap;
 }
 
 .nav__button::before {

@@ -1,4 +1,11 @@
-/* Shot Display Container */
+/* Shot Display Container.
+ *
+ * overflow-y: auto lets the metric stack scroll on viewports too short
+ * to show every card (phone portrait, narrow desktop windows). On the
+ * kiosk and any tall viewport the content fits and no scrollbar appears.
+ * overflow-x stays hidden so the corner-accent ::before stays clipped
+ * to the rounded card boundary.
+ */
 .shot-display {
   background: linear-gradient(145deg, var(--color-bg-card) 0%, var(--color-bg-elevated) 100%);
   border: 1px solid rgba(212, 175, 55, 0.1);
@@ -10,6 +17,8 @@
   flex-direction: column;
   position: relative;
   overflow: hidden;
+  overflow-y: auto;
+  min-height: 0; /* allow the flex child to shrink so the scrollbar engages */
 }
 
 /* Subtle corner accent */
