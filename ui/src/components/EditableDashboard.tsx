@@ -106,8 +106,17 @@ export function EditableDashboard({
     return <div className={className}>{renderableChildren}</div>;
   }
 
+  /*
+   * Edit mode: deliberately do NOT pass the caller's className through.
+   * The shot-display / stats-view CSS classes carry their own
+   * `display: grid; grid-template-columns: ...` rules — those compete
+   * with react-grid-layout's absolute-positioned children and result in
+   * cards stacking in a single column instead of using the full grid.
+   * The `.editable-dashboard--editing` class supplies the sizing
+   * (width: 100%, flex: 1) we actually need.
+   */
   return (
-    <div className={`editable-dashboard editable-dashboard--editing ${className ?? ''}`}>
+    <div className="editable-dashboard editable-dashboard--editing">
       <ResponsiveGridLayout
         className="editable-dashboard__grid"
         layouts={layouts as unknown as Layouts}
