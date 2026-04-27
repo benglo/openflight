@@ -14,10 +14,17 @@
 }
 
 /* Header */
+/*
+ * Header — wraps on narrow viewports so controls don't get clipped.
+ * On the kiosk (800px+) everything sits on a single row; on a phone
+ * portrait window the controls strip wraps below the logo.
+ */
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
   padding: var(--space-sm) var(--space-lg);
   background: linear-gradient(180deg, var(--color-bg-elevated) 0%, var(--color-bg-card) 100%);
   border-bottom: 1px solid rgba(212, 175, 55, 0.15);
@@ -33,7 +40,9 @@
 .header__controls {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-sm);
+  justify-content: flex-end;
 }
 
 .unit-toggle {

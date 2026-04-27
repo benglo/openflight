@@ -96,6 +96,15 @@
   padding: var(--space-lg) var(--space-md);
 }
 
+/* Drop to 2 columns on narrow viewports so the supporting cards keep
+   readable width. Hero card already uses grid-column: 1 / -1 so it
+   adapts automatically. */
+@media (max-width: 600px) {
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 /*
  * Stat cards are <div><dt><dd> after the semantic refactor. We render
  * the value above the label visually (the original design intent),
