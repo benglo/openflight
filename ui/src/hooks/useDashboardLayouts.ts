@@ -33,7 +33,7 @@ export interface LayoutItem {
   static?: boolean;
 }
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 const STORAGE_KEY = 'openflight.dashboard.v1';
 
 // `erasableSyntaxOnly` is enabled in tsconfig, so we use a const object
@@ -51,10 +51,22 @@ export interface DashboardLayouts {
   phone: LayoutItem[];
 }
 
+/**
+ * Per-view persisted state. `hidden` holds the ids the user has chosen
+ * to omit from the dashboard; the live layout only contains entries
+ * for visible cards. Ids in `hidden` are still in `cardIds` (the parent
+ * always renders the full set), but EditableDashboard filters them out
+ * so RGL never sees them.
+ */
+interface ViewState {
+  layouts: DashboardLayouts;
+  hidden: string[];
+}
+
 interface StoredShape {
   version: number;
-  live?: DashboardLayouts;
-  stats?: DashboardLayouts;
+  live?: ViewState;
+  stats?: ViewState;
 }
 
 // --- Defaults ---
@@ -159,10 +171,10 @@ function readStored(): StoredShape | null {
   }
 }
 
-function writeStored(view: DashboardKey, layouts: DashboardLayouts) {
+function writeStored(view: DashboardKey, state: ViewState) {
   try {
     const existing = readStored() ?? { version: SCHEMA_VERSION };
-    const merged = { ...existing, version: SCHEMA_VERSION, [view]: layouts };
+    const merged = { ...existing, version: SCHEMA_VERSION, [view]: state };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
   } catch {
     /* private browsing / quota — silently degrade. */
@@ -201,6 +213,16 @@ function reconcile(
   };
 }
 
+function visibleIds(
+  knownIds: readonly string[] | undefined,
+  hidden: readonly string[],
+): readonly string[] | undefined {
+  if (!knownIds) return knownIds;
+  if (hidden.length === 0) return knownIds;
+  const hiddenSet = new Set(hidden);
+  return knownIds.filter((id) => !hiddenSet.has(id));
+}
+
 // --- Public hook ---
 
 export function useDashboardLayouts(view: DashboardKey, knownIds?: readonly string[]) {
@@ -209,26 +231,41 @@ export function useDashboardLayouts(view: DashboardKey, knownIds?: readonly stri
   const initial = useMemo(() => {
     const stored = readStored();
     const fromStorage = stored?.[view];
+    const hidden = fromStorage?.hidden ?? [];
+    const visible = visibleIds(knownIds, hidden);
     if (fromStorage) {
-      return { layouts: reconcile(fromStorage, knownIds), usingDefault: false };
+      return {
+        layouts: reconcile(fromStorage.layouts, visible),
+        hidden,
+        usingDefault: false,
+      };
     }
-    return { layouts: reconcile(DEFAULTS[view], knownIds), usingDefault: true };
+    return {
+      layouts: reconcile(DEFAULTS[view], visible),
+      hidden,
+      usingDefault: true,
+    };
     // initial computation only — knownIds drives a later effect
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [layouts, setLayoutsState] = useState<DashboardLayouts>(initial.layouts);
+  const [hidden, setHiddenState] = useState<string[]>(initial.hidden);
   const [usingDefault, setUsingDefault] = useState<boolean>(initial.usingDefault);
 
-  // Debounced persistence — drag emits many events.
+  // Debounced persistence — drag emits many events; hide/show is rare
+  // but goes through the same path so the two stay in sync on disk.
   const writeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (writeTimer.current) clearTimeout(writeTimer.current);
-    writeTimer.current = setTimeout(() => writeStored(view, layouts), 250);
+    writeTimer.current = setTimeout(
+      () => writeStored(view, { layouts, hidden }),
+      250,
+    );
     return () => {
       if (writeTimer.current) clearTimeout(writeTimer.current);
     };
-  }, [layouts, view]);
+  }, [layouts, hidden, view]);
 
   const setLayouts = useCallback((next: DashboardLayouts) => {
     setLayoutsState(next);
@@ -236,18 +273,40 @@ export function useDashboardLayouts(view: DashboardKey, knownIds?: readonly stri
   }, []);
 
   const reset = useCallback(() => {
+    setHiddenState([]);
     setLayoutsState(reconcile(DEFAULTS[view], knownIds));
     setUsingDefault(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, knownKey]);
 
-  // If knownIds changes (e.g. a card is added/removed in code on a hot
-  // reload), re-reconcile so the layout includes/drops the right ids.
+  const hide = useCallback((id: string) => {
+    setHiddenState((curr) => (curr.includes(id) ? curr : [...curr, id]));
+    setLayoutsState((curr) => ({
+      kiosk: curr.kiosk.filter((it) => it.i !== id),
+      tablet: curr.tablet.filter((it) => it.i !== id),
+      phone: curr.phone.filter((it) => it.i !== id),
+    }));
+    setUsingDefault(false);
+  }, []);
+
+  // Show: drop from hidden, then let the reconcile effect re-append the
+  // id at the bottom of each breakpoint's layout.
+  const show = useCallback((id: string) => {
+    setHiddenState((curr) => curr.filter((h) => h !== id));
+    setUsingDefault(false);
+  }, []);
+
+  // If knownIds OR hidden changes (e.g. a card added in code, or the
+  // user un-hid one), re-reconcile so the layout matches the visible
+  // set. Hiding is handled inline above (we filter the layout there);
+  // this effect catches the un-hide path and code-level changes.
+  const hiddenKey = hidden.join('|');
   useEffect(() => {
     if (!knownIds) return;
-    setLayoutsState((current) => reconcile(current, knownIds));
+    const visible = visibleIds(knownIds, hidden);
+    setLayoutsState((current) => reconcile(current, visible));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [knownKey]);
+  }, [knownKey, hiddenKey]);
 
-  return { layouts, setLayouts, reset, usingDefault };
+  return { layouts, setLayouts, reset, usingDefault, hidden, hide, show };
 }

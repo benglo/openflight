@@ -22,6 +22,16 @@ const STATS_CARD_IDS = [
   'avg_smash',
 ] as const;
 
+// Friendly labels for EditableDashboard's hidden-cards drawer.
+const STATS_CARD_LABELS: Record<string, string> = {
+  avg_carry: 'Avg Carry',
+  shots: 'Shots',
+  avg_ball: 'Avg Ball',
+  max_ball: 'Max Ball',
+  avg_club: 'Avg Club',
+  avg_smash: 'Avg Smash',
+};
+
 export function StatsView({ shots, onClearSession }: StatsViewProps) {
   const [selectedClub, setSelectedClub] = useState<string | null>(null);
   const { unitSystem } = useUnitPreference();
@@ -111,7 +121,7 @@ export function StatsView({ shots, onClearSession }: StatsViewProps) {
       <EditableDashboard
         view={DashboardKey.Stats}
         cardIds={STATS_CARD_IDS}
-        className="stats-grid"
+        cardLabels={STATS_CARD_LABELS}
       >
         <div key="avg_carry" className="stat-card stat-card--primary">
           <span className="stat-card__label">Avg Carry ({distanceUnit})</span>

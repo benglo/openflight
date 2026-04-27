@@ -83,8 +83,7 @@
     gap: var(--space-lg);
   }
 
-  .shot-display__primary,
-  .shot-display__metrics {
+  .shot-display__primary {
     flex: 0 0 auto;
     width: 100%;
   }
@@ -93,35 +92,6 @@
     max-width: 320px;
     margin: 0 auto;
   }
-}
-
-/*
- * Right-side metrics grid. Primary cards (carry, sim carry) break out
- * to span the full width of the grid so the layout reads as a rhythm
- * of "here's an answer / here's its supporting context" rather than
- * a wall of identical tiles. Spacing is also varied: tighter inside a
- * group, looser between primaries and the cards below them, via the
- * margin-top rule on the row that follows a primary.
- */
-.shot-display__metrics {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-xs) var(--space-sm);
-  flex: 1.2;
-  align-content: start;
-}
-
-/* Primary metric cards span the full grid — they ARE the answer, the
-   surrounding tertiary cards are context. */
-.shot-display__metrics > .metric-card--primary {
-  grid-column: 1 / -1;
-  margin-top: var(--space-xs);
-}
-
-/* First child shouldn't have the extra top space — it's the start
-   of the section, not a divider between groups. */
-.shot-display__metrics > .metric-card--primary:first-child {
-  margin-top: 0;
 }
 
 /* Speed Gauge */
@@ -496,12 +466,6 @@
   .shot-display__layout {
     gap: var(--space-sm);
     min-height: 0;
-  }
-
-  .shot-display__metrics {
-    gap: var(--space-xs);
-    min-height: 0;
-    grid-template-columns: 1fr 1fr;
   }
 
   .speed-gauge {

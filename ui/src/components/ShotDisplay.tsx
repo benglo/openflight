@@ -25,6 +25,24 @@ const LIVE_CARD_IDS = [
   'sim_apex',
 ] as const;
 
+// Friendly labels — used by EditableDashboard's "hidden cards" drawer
+// so users see "Spin Rate" rather than "spin_rpm" when re-adding a
+// card. Keep in sync with LIVE_CARD_IDS / the MetricCard `label` props.
+const LIVE_CARD_LABELS: Record<string, string> = {
+  carry: 'Est. Carry',
+  club_speed: 'Club Speed',
+  v_launch: 'V. Launch',
+  club_aoa: 'Club AoA',
+  club_path: 'Club Path',
+  spin_axis: 'Spin Axis',
+  h_launch: 'H. Launch',
+  spin_rpm: 'Spin Rate',
+  sim_carry: 'Sim Carry',
+  sim_total: 'Sim Total',
+  sim_lateral: 'Sim Lateral',
+  sim_apex: 'Sim Apex',
+};
+
 interface ShotDisplayProps {
   shot: Shot | null;
   animate?: boolean;
@@ -229,15 +247,15 @@ export function ShotDisplay({ shot, animate = false, simResult = null }: ShotDis
          * show "—" when their value is missing rather than
          * disappearing.
          *
-         * The EditableDashboard wrapper renders a plain CSS grid
-         * (today's look) when edit mode is off, and react-grid-layout
-         * when edit mode is on. Users see no visual difference until
-         * they hit the edit toggle in the header.
+         * The EditableDashboard wrapper renders the same RGL layout in
+         * both view and edit modes — only edit mode lights up drag /
+         * resize / outlines, so any change made in edit mode is
+         * visible the moment the user exits.
          */}
         <EditableDashboard
           view={DashboardKey.Live}
           cardIds={LIVE_CARD_IDS}
-          className="shot-display__metrics"
+          cardLabels={LIVE_CARD_LABELS}
         >
           <MetricCard
             key="carry"
