@@ -50,28 +50,46 @@ app = Flask(__name__, static_folder="../../ui/dist", static_url_path="")
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
-# Global state
-monitor = None
-mock_mode: bool = False
-debug_mode: bool = False
-debug_log_file = None
-debug_log_path: Optional[Path] = None
 
-# K-LD7 angle radars (vertical = launch angle, horizontal = club path)
-kld7_vertical = None
-kld7_horizontal = None
+class AppState:  # pylint: disable=too-few-public-methods
+    """Mutable runtime state for the server, grouped for clarity and testability.
 
-# Camera state
-camera: Optional["Picamera2"] = None
-camera_tracker: Optional["CameraTracker"] = None
-camera_enabled: bool = False
-camera_streaming: bool = False
-camera_thread: Optional[threading.Thread] = None
-camera_stop_event: Optional[threading.Event] = None
-ball_detected: bool = False
-ball_detection_confidence: float = 0.0
-latest_frame: Optional[bytes] = None
-frame_lock = threading.Lock()
+    Flask `app` and `socketio` remain module-level since their decorator-based
+    routes/handlers attach at import time. Everything else that's actually
+    *state* (radar monitor, K-LD7 trackers, camera, debug flags) lives here.
+    """
+
+    def __init__(self) -> None:
+        # Radar monitor + mode
+        self.monitor = None
+        self.mock_mode: bool = False
+
+        # Debug logging
+        self.debug_mode: bool = False
+        self.debug_log_file = None
+        self.debug_log_path: Optional[Path] = None
+
+        # K-LD7 angle radars (vertical = launch angle, horizontal = club path)
+        self.kld7_vertical = None
+        self.kld7_horizontal = None
+
+        # Camera state
+        self.camera: Optional["Picamera2"] = None
+        self.camera_tracker: Optional["CameraTracker"] = None
+        self.camera_enabled: bool = False
+        self.camera_streaming: bool = False
+        self.camera_thread: Optional[threading.Thread] = None
+        self.camera_stop_event: Optional[threading.Event] = None
+        self.ball_detected: bool = False
+        self.ball_detection_confidence: float = 0.0
+        self.latest_frame: Optional[bytes] = None
+        self.frame_lock = threading.Lock()
+
+        # Radar configuration (mutated via socket events)
+        self.radar_config: dict = {}
+
+
+state = AppState()
 
 
 # Baseline launch angles by club (TrackMan data)
@@ -303,10 +321,10 @@ def api_shutdown():
         _time.sleep(0.5)
         # Clean up before exit
         try:
-            if kld7_vertical:
-                kld7_vertical.stop()
-            if kld7_horizontal:
-                kld7_horizontal.stop()
+            if state.kld7_vertical:
+                state.kld7_vertical.stop()
+            if state.kld7_horizontal:
+                state.kld7_horizontal.stop()
             stop_monitor()
         except Exception:
             pass
@@ -331,8 +349,6 @@ def init_camera(
     hough_min_dist: int = 266,
 ):
     """Initialize camera and ball tracker (Hough, YOLO, or Roboflow)."""
-    global camera, camera_tracker, camera_enabled  # pylint: disable=global-statement
-
     if not CV2_AVAILABLE:
         print("OpenCV not available - camera disabled")
         return False
@@ -343,32 +359,32 @@ def init_camera(
 
     try:
         # Initialize PiCamera with optimized settings for speed
-        camera = Picamera2()
-        config = camera.create_video_configuration(
+        state.camera = Picamera2()
+        config = state.camera.create_video_configuration(
             main={"size": (640, 480), "format": "RGB888"},
             buffer_count=2,  # Balance between latency and stability
             controls={"FrameRate": 60},  # Higher FPS for ball tracking
         )
-        camera.configure(config)
-        camera.start()
+        state.camera.configure(config)
+        state.camera.start()
         time.sleep(0.5)
 
         # Initialize tracker - default to Hough + ByteTrack
         if roboflow_model_id:
-            camera_tracker = CameraTracker(
+            state.camera_tracker = CameraTracker(
                 roboflow_model_id=roboflow_model_id,
                 roboflow_api_key=roboflow_api_key,
                 imgsz=imgsz,
                 use_hough=False,
             )
         elif not use_hough and model_path and os.path.exists(model_path):
-            camera_tracker = CameraTracker(
+            state.camera_tracker = CameraTracker(
                 model_path=model_path,
                 imgsz=imgsz,
                 use_hough=False,
             )
         else:
-            camera_tracker = CameraTracker(
+            state.camera_tracker = CameraTracker(
                 use_hough=True,
                 hough_param2=hough_param2,
                 hough_param1=hough_param1,
@@ -378,13 +394,13 @@ def init_camera(
             )
 
         # Auto-enable camera when initialized
-        camera_enabled = True
+        state.camera_enabled = True
         return True
 
     except Exception as e:
         print(f"Failed to initialize camera: {e}")
-        camera = None
-        camera_tracker = None
+        state.camera = None
+        state.camera_tracker = None
         return False
 
 
@@ -392,9 +408,8 @@ def init_kld7(port=None, orientation="vertical", angle_offset_deg=0.0, base_freq
     """Initialize a single K-LD7 angle radar tracker.
 
     Returns True if the tracker connected and started successfully.
-    Sets the appropriate global (kld7_vertical or kld7_horizontal).
+    Sets state.kld7_vertical or state.kld7_horizontal.
     """
-    global kld7_vertical, kld7_horizontal  # pylint: disable=global-statement
     try:
         from openflight.kld7 import KLD7Tracker
 
@@ -417,9 +432,9 @@ def init_kld7(port=None, orientation="vertical", angle_offset_deg=0.0, base_freq
                     base_freq=base_freq,
                 )
             if orientation == "vertical":
-                kld7_vertical = tracker
+                state.kld7_vertical = tracker
             else:
-                kld7_horizontal = tracker
+                state.kld7_horizontal = tracker
             return True
         else:
             return False
@@ -430,48 +445,48 @@ def init_kld7(port=None, orientation="vertical", angle_offset_deg=0.0, base_freq
 
 def camera_processing_loop():
     """Background thread for camera processing."""
-    global ball_detected, ball_detection_confidence, latest_frame  # pylint: disable=global-statement
-
-    while not camera_stop_event.is_set():
-        if not camera or not camera_enabled:
+    while not state.camera_stop_event.is_set():
+        if not state.camera or not state.camera_enabled:
             time.sleep(0.1)
             continue
 
         try:
-            frame = camera.capture_array()
+            frame = state.camera.capture_array()
 
             # Run detection if tracker available
-            if camera_tracker:
-                detection = camera_tracker.process_frame(frame)
+            if state.camera_tracker:
+                detection = state.camera_tracker.process_frame(frame)
                 new_detected = detection is not None
                 new_confidence = detection.confidence if detection else 0.0
 
                 # Emit update if state changed
                 if (
-                    new_detected != ball_detected
-                    or abs(new_confidence - ball_detection_confidence) > 0.05
+                    new_detected != state.ball_detected
+                    or abs(new_confidence - state.ball_detection_confidence) > 0.05
                 ):
-                    ball_detected = new_detected
-                    ball_detection_confidence = new_confidence
+                    state.ball_detected = new_detected
+                    state.ball_detection_confidence = new_confidence
                     socketio.emit(
                         "ball_detection",
                         {
-                            "detected": ball_detected,
-                            "confidence": round(ball_detection_confidence, 2),
+                            "detected": state.ball_detected,
+                            "confidence": round(state.ball_detection_confidence, 2),
                         },
                     )
 
                 # Get debug frame with overlay if streaming
-                if camera_streaming:
-                    frame = camera_tracker.get_debug_frame(frame)
+                if state.camera_streaming:
+                    frame = state.camera_tracker.get_debug_frame(frame)
 
             # Encode frame for streaming
-            if camera_streaming:
-                # Convert RGB to BGR for cv2
+            if state.camera_streaming:
+                # Convert RGB to BGR for cv2.
+                # pylint: disable=no-member  # cv2 may be unavailable; gated by state.camera_streaming.
                 frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
                 _, jpeg = cv2.imencode(".jpg", frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, 70])
-                with frame_lock:
-                    latest_frame = jpeg.tobytes()
+                # pylint: enable=no-member
+                with state.frame_lock:
+                    state.latest_frame = jpeg.tobytes()
 
         except Exception as e:
             print(f"Camera processing error: {e}")
@@ -480,36 +495,32 @@ def camera_processing_loop():
 
 def start_camera_thread():
     """Start the camera processing thread."""
-    global camera_thread, camera_stop_event  # pylint: disable=global-statement
-
-    if camera_thread and camera_thread.is_alive():
+    if state.camera_thread and state.camera_thread.is_alive():
         return
 
-    camera_stop_event = threading.Event()
-    camera_thread = threading.Thread(target=camera_processing_loop, daemon=True)
-    camera_thread.start()
+    state.camera_stop_event = threading.Event()
+    state.camera_thread = threading.Thread(target=camera_processing_loop, daemon=True)
+    state.camera_thread.start()
     print("Camera processing thread started")
 
 
 def stop_camera_thread():
     """Stop the camera processing thread."""
-    global camera_thread, camera_stop_event  # pylint: disable=global-statement
-
-    if camera_stop_event:
-        camera_stop_event.set()
-    if camera_thread:
-        camera_thread.join(timeout=2.0)
-        camera_thread = None
+    if state.camera_stop_event:
+        state.camera_stop_event.set()
+    if state.camera_thread:
+        state.camera_thread.join(timeout=2.0)
+        state.camera_thread = None
 
 
 def generate_mjpeg():
     """Generator for MJPEG stream."""
     while True:
-        if not camera_streaming:
+        if not state.camera_streaming:
             break
 
-        with frame_lock:
-            frame = latest_frame
+        with state.frame_lock:
+            frame = state.latest_frame
 
         if frame:
             yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame + b"\r\n")
@@ -520,7 +531,7 @@ def generate_mjpeg():
 @app.route("/camera/stream")
 def camera_stream():
     """MJPEG stream endpoint."""
-    if not camera_enabled or not camera_streaming:
+    if not state.camera_enabled or not state.camera_streaming:
         return "Camera not available", 503
 
     return Response(generate_mjpeg(), mimetype="multipart/x-mixed-replace; boundary=frame")
@@ -529,54 +540,50 @@ def camera_stream():
 @socketio.on("toggle_camera")
 def handle_toggle_camera():
     """Toggle camera on/off."""
-    global camera_enabled  # pylint: disable=global-statement
-
-    if not camera:
+    if not state.camera:
         socketio.emit(
             "camera_status",
             {"enabled": False, "available": False, "error": "Camera not initialized"},
         )
         return
 
-    camera_enabled = not camera_enabled
+    state.camera_enabled = not state.camera_enabled
     socketio.emit(
         "camera_status",
         {
-            "enabled": camera_enabled,
+            "enabled": state.camera_enabled,
             "available": True,
-            "streaming": camera_streaming,
+            "streaming": state.camera_streaming,
         },
     )
-    print(f"Camera {'enabled' if camera_enabled else 'disabled'}")
+    print(f"Camera {'enabled' if state.camera_enabled else 'disabled'}")
 
 
 @socketio.on("toggle_camera_stream")
 def handle_toggle_camera_stream():
     """Toggle camera streaming on/off."""
-    global camera_streaming  # pylint: disable=global-statement
-
-    if not camera or not camera_enabled:
+    if not state.camera or not state.camera_enabled:
         socketio.emit(
             "camera_status",
             {
-                "enabled": camera_enabled,
-                "available": camera is not None,
+                "enabled": state.camera_enabled,
+                "available": state.camera is not None,
                 "streaming": False,
                 "error": "Camera not enabled",
             },
         )
         return
 
-    camera_streaming = not camera_streaming
+    state.camera_streaming = not state.camera_streaming
     socketio.emit(
         "camera_status",
         {
-            "enabled": camera_enabled,
+            "enabled": state.camera_enabled,
             "available": True,
-            "streaming": camera_streaming,
+            "streaming": state.camera_streaming,
         },
     )
-    print(f"Camera streaming {'started' if camera_streaming else 'stopped'}")
+    print(f"Camera streaming {'started' if state.camera_streaming else 'stopped'}")
 
 
 @socketio.on("get_camera_status")
@@ -585,27 +592,25 @@ def handle_get_camera_status():
     socketio.emit(
         "camera_status",
         {
-            "enabled": camera_enabled,
-            "available": camera is not None,
-            "streaming": camera_streaming,
-            "ball_detected": ball_detected,
-            "ball_confidence": round(ball_detection_confidence, 2),
+            "enabled": state.camera_enabled,
+            "available": state.camera is not None,
+            "streaming": state.camera_streaming,
+            "ball_detected": state.ball_detected,
+            "ball_confidence": round(state.ball_detection_confidence, 2),
         },
     )
 
 
 def start_debug_logging():
     """Start logging raw readings to a file."""
-    global debug_log_file, debug_log_path  # pylint: disable=global-statement
-
     # Create logs directory
     log_dir = Path.home() / "openflight_logs"
     log_dir.mkdir(exist_ok=True)
 
     # Create timestamped log file
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    debug_log_path = log_dir / f"debug_{timestamp}.jsonl"
-    debug_log_file = open(debug_log_path, "w")  # pylint: disable=consider-using-with
+    state.debug_log_path = log_dir / f"debug_{timestamp}.jsonl"
+    state.debug_log_file = open(state.debug_log_path, "w")  # pylint: disable=consider-using-with
 
     # Enable radar raw logging
     radar_logger = logging.getLogger("ops243")
@@ -621,24 +626,22 @@ def start_debug_logging():
     radar_raw_logger.addHandler(file_handler)
     radar_logger.addHandler(file_handler)
 
-    print(f"Debug logging to: {debug_log_path}")
+    print(f"Debug logging to: {state.debug_log_path}")
     print(f"Raw radar logging to: {raw_log_path}")
-    return str(debug_log_path)
+    return str(state.debug_log_path)
 
 
 def stop_debug_logging():
     """Stop logging and close the file."""
-    global debug_log_file, debug_log_path  # pylint: disable=global-statement
-
-    if debug_log_file:
-        debug_log_file.close()
-        debug_log_file = None
-        print(f"Debug log saved: {debug_log_path}")
+    if state.debug_log_file:
+        state.debug_log_file.close()
+        state.debug_log_file = None
+        print(f"Debug log saved: {state.debug_log_path}")
 
 
 def log_debug_reading(reading: SpeedReading):
     """Log a raw reading to the debug file."""
-    if debug_log_file:
+    if state.debug_log_file:
         entry = {
             "timestamp": datetime.now().isoformat(),
             "type": "reading",
@@ -647,8 +650,8 @@ def log_debug_reading(reading: SpeedReading):
             "magnitude": reading.magnitude,
             "unit": reading.unit,
         }
-        debug_log_file.write(json.dumps(entry) + "\n")
-        debug_log_file.flush()
+        state.debug_log_file.write(json.dumps(entry) + "\n")
+        state.debug_log_file.flush()
 
         # Also print to console for immediate feedback
         print(
@@ -659,7 +662,7 @@ def log_debug_reading(reading: SpeedReading):
 def on_live_reading(reading: SpeedReading):
     """Callback for live radar readings - used in debug mode."""
     # Log ALL readings first (before filtering) so we can debug direction issues
-    if debug_mode:
+    if state.debug_mode:
         log_debug_reading(reading)
 
         # Emit ALL readings to UI debug panel (including inbound)
@@ -685,23 +688,23 @@ def _get_trigger_status() -> dict:
     """Build trigger status payload for the UI."""
     from .rolling_buffer import RollingBufferMonitor  # pylint: disable=import-outside-toplevel
 
-    is_rolling_buffer = isinstance(monitor, RollingBufferMonitor)
+    is_rolling_buffer = isinstance(state.monitor, RollingBufferMonitor)
     session_logger = get_session_logger()
     stats = session_logger.stats if session_logger else {}
 
-    mode = "mock" if mock_mode else "rolling-buffer"
+    mode = "mock" if state.mock_mode else "rolling-buffer"
     trigger_type = None
     radar_port = None
 
     if is_rolling_buffer:
-        trigger_type = monitor.trigger_type
-        if hasattr(monitor, "radar") and hasattr(monitor.radar, "port"):
-            radar_port = monitor.radar.port
+        trigger_type = state.monitor.trigger_type
+        if hasattr(state.monitor, "radar") and hasattr(state.monitor.radar, "port"):
+            radar_port = state.monitor.radar.port
 
     return {
         "mode": mode,
         "trigger_type": trigger_type,
-        "radar_connected": monitor is not None and not mock_mode,
+        "radar_connected": state.monitor is not None and not state.mock_mode,
         "radar_port": radar_port,
         "triggers_total": stats.get("triggers_total", 0),
         "triggers_accepted": stats.get("triggers_accepted", 0),
@@ -713,20 +716,20 @@ def _get_trigger_status() -> dict:
 def handle_connect():
     """Handle client connection."""
     print("Client connected")
-    if monitor:
-        stats = monitor.get_session_stats()
-        shots = [shot_to_dict(s) for s in monitor.get_shots()]
+    if state.monitor:
+        stats = state.monitor.get_session_stats()
+        shots = [shot_to_dict(s) for s in state.monitor.get_shots()]
         socketio.emit(
             "session_state",
             {
                 "stats": stats,
                 "shots": shots,
-                "mock_mode": mock_mode,
-                "debug_mode": debug_mode,
-                "camera_available": camera is not None,
-                "camera_enabled": camera_enabled,
-                "camera_streaming": camera_streaming,
-                "ball_detected": ball_detected,
+                "mock_mode": state.mock_mode,
+                "debug_mode": state.debug_mode,
+                "camera_available": state.camera is not None,
+                "camera_enabled": state.camera_enabled,
+                "camera_streaming": state.camera_streaming,
+                "ball_detected": state.ball_detected,
             },
         )
         socketio.emit("trigger_status", _get_trigger_status())
@@ -750,8 +753,8 @@ def handle_set_club(data):
     club_name = data.get("club", "driver")
     try:
         club = ClubType(club_name)
-        if monitor:
-            monitor.set_club(club)
+        if state.monitor:
+            state.monitor.set_club(club)
         socketio.emit("club_changed", {"club": club.value})
     except ValueError:
         pass
@@ -760,35 +763,33 @@ def handle_set_club(data):
 @socketio.on("clear_session")
 def handle_clear_session():
     """Clear all recorded shots."""
-    if monitor:
-        monitor.clear_session()
+    if state.monitor:
+        state.monitor.clear_session()
         socketio.emit("session_cleared")
 
 
 @socketio.on("get_session")
 def handle_get_session():
     """Get current session data."""
-    if monitor:
-        stats = monitor.get_session_stats()
-        shots = [shot_to_dict(s) for s in monitor.get_shots()]
+    if state.monitor:
+        stats = state.monitor.get_session_stats()
+        shots = [shot_to_dict(s) for s in state.monitor.get_shots()]
         socketio.emit("session_state", {"stats": stats, "shots": shots})
 
 
 @socketio.on("simulate_shot")
 def handle_simulate_shot():
     """Simulate a shot (only works in mock mode)."""
-    if monitor and isinstance(monitor, MockLaunchMonitor):
-        monitor.simulate_shot()
+    if state.monitor and isinstance(state.monitor, MockLaunchMonitor):
+        state.monitor.simulate_shot()
 
 
 @socketio.on("toggle_debug")
 def handle_toggle_debug():
     """Toggle debug mode on/off."""
-    global debug_mode  # pylint: disable=global-statement
+    state.debug_mode = not state.debug_mode
 
-    debug_mode = not debug_mode
-
-    if debug_mode:
+    if state.debug_mode:
         log_path = start_debug_logging()
         socketio.emit("debug_toggled", {"enabled": True, "log_path": log_path})
         print("Debug mode ENABLED")
@@ -804,14 +805,14 @@ def handle_get_debug_status():
     socketio.emit(
         "debug_status",
         {
-            "enabled": debug_mode,
-            "log_path": str(debug_log_path) if debug_log_path else None,
+            "enabled": state.debug_mode,
+            "log_path": str(state.debug_log_path) if state.debug_log_path else None,
         },
     )
 
 
-# Radar tuning state
-radar_config = {
+# Initial radar tuning defaults (mutated via set_radar_config socket events)
+state.radar_config = {
     "min_speed": 10,
     "max_speed": 220,
     "min_magnitude": 0,
@@ -822,15 +823,13 @@ radar_config = {
 @socketio.on("get_radar_config")
 def handle_get_radar_config():
     """Get current radar configuration."""
-    socketio.emit("radar_config", radar_config)
+    socketio.emit("radar_config", state.radar_config)
 
 
 @socketio.on("set_radar_config")
 def handle_set_radar_config(data):
     """Update radar configuration."""
-    global radar_config  # pylint: disable=global-statement
-
-    if not monitor or mock_mode:
+    if not state.monitor or state.mock_mode:
         socketio.emit("radar_config_error", {"error": "Radar not connected"})
         return
 
@@ -838,48 +837,48 @@ def handle_set_radar_config(data):
         # Update min speed filter
         if "min_speed" in data:
             new_min = int(data["min_speed"])
-            monitor.radar.set_min_speed_filter(new_min)
-            radar_config["min_speed"] = new_min
+            state.monitor.radar.set_min_speed_filter(new_min)
+            state.radar_config["min_speed"] = new_min
             print(f"Set min speed filter: {new_min} mph")
 
         # Update max speed filter
         if "max_speed" in data:
             new_max = int(data["max_speed"])
-            monitor.radar.set_max_speed_filter(new_max)
-            radar_config["max_speed"] = new_max
+            state.monitor.radar.set_max_speed_filter(new_max)
+            state.radar_config["max_speed"] = new_max
             print(f"Set max speed filter: {new_max} mph")
 
         # Update magnitude filter
         if "min_magnitude" in data:
             new_mag = int(data["min_magnitude"])
-            monitor.radar.set_magnitude_filter(min_mag=new_mag)
-            radar_config["min_magnitude"] = new_mag
+            state.monitor.radar.set_magnitude_filter(min_mag=new_mag)
+            state.radar_config["min_magnitude"] = new_mag
             print(f"Set min magnitude filter: {new_mag}")
 
         # Update transmit power (0=max, 7=min)
         if "transmit_power" in data:
             new_power = int(data["transmit_power"])
             if 0 <= new_power <= 7:
-                monitor.radar.set_transmit_power(new_power)
-                radar_config["transmit_power"] = new_power
+                state.monitor.radar.set_transmit_power(new_power)
+                state.radar_config["transmit_power"] = new_power
                 print(f"Set transmit power: {new_power}")
 
         # Log config change
         session_logger = get_session_logger()
         if session_logger:
-            session_logger.log_config_change(radar_config.copy(), source="user")
+            session_logger.log_config_change(state.radar_config.copy(), source="user")
 
         # Legacy debug logging
-        if debug_mode and debug_log_file:
+        if state.debug_mode and state.debug_log_file:
             entry = {
                 "timestamp": datetime.now().isoformat(),
                 "type": "config_change",
-                "config": radar_config.copy(),
+                "config": state.radar_config.copy(),
             }
-            debug_log_file.write(json.dumps(entry) + "\n")
-            debug_log_file.flush()
+            state.debug_log_file.write(json.dumps(entry) + "\n")
+            state.debug_log_file.flush()
 
-        socketio.emit("radar_config", radar_config)
+        socketio.emit("radar_config", state.radar_config)
 
     except Exception as e:
         print(f"Error setting radar config: {e}")
@@ -897,10 +896,10 @@ def handle_shutdown():
         import time as _time, os
         _time.sleep(0.5)
         try:
-            if kld7_vertical:
-                kld7_vertical.stop()
-            if kld7_horizontal:
-                kld7_horizontal.stop()
+            if state.kld7_vertical:
+                state.kld7_vertical.stop()
+            if state.kld7_horizontal:
+                state.kld7_horizontal.stop()
             stop_monitor()
         except Exception:
             pass
@@ -912,8 +911,6 @@ def handle_shutdown():
 
 def on_shot_detected(shot: Shot):
     """Callback when a shot is detected - emit to all clients."""
-    global ball_detected, ball_detection_confidence  # pylint: disable=global-statement
-
     logger.info("[SERVER] Shot callback: %.1f mph", shot.ball_speed_mph)
 
     kld7_ms = None
@@ -925,9 +922,9 @@ def on_shot_detected(shot: Shot):
             session_log = get_session_logger()
 
             # --- Vertical K-LD7 (launch angle) ---
-            if kld7_vertical:
-                raw_buffer = kld7_vertical.snapshot_buffer()
-                kld7_angle = kld7_vertical.get_angle_for_shot(
+            if state.kld7_vertical:
+                raw_buffer = state.kld7_vertical.snapshot_buffer()
+                kld7_angle = state.kld7_vertical.get_angle_for_shot(
                     shot_timestamp=shot_ts,
                     ball_speed_mph=shot.ball_speed_mph,
                 )
@@ -971,7 +968,9 @@ def on_shot_detected(shot: Shot):
                     )
                 # Club angle of attack (same RADC buffer, club speed from OPS)
                 if shot.club_speed_mph:
-                    club_angle_v = kld7_vertical.get_club_angle(club_speed_mph=shot.club_speed_mph)
+                    club_angle_v = state.kld7_vertical.get_club_angle(
+                        club_speed_mph=shot.club_speed_mph,
+                    )
                     if club_angle_v and club_angle_v.vertical_deg is not None:
                         # Negate: the radar sees where the club IS (above center = positive),
                         # but AoA is the club's attack direction (descending = negative).
@@ -986,12 +985,12 @@ def on_shot_detected(shot: Shot):
                             logger.warning("[SERVER] Club AoA rejected: %.1f° outside plausible range",
                                            candidate_aoa)
 
-                kld7_vertical.reset()
+                state.kld7_vertical.reset()
 
             # --- Horizontal K-LD7 (club path / aim direction) ---
-            if kld7_horizontal:
-                raw_buffer_h = kld7_horizontal.snapshot_buffer()
-                kld7_angle_h = kld7_horizontal.get_angle_for_shot(
+            if state.kld7_horizontal:
+                raw_buffer_h = state.kld7_horizontal.snapshot_buffer()
+                kld7_angle_h = state.kld7_horizontal.get_angle_for_shot(
                     shot_timestamp=shot_ts,
                     ball_speed_mph=shot.ball_speed_mph,
                 )
@@ -1028,13 +1027,15 @@ def on_shot_detected(shot: Shot):
                     )
                 # Club path (same RADC buffer, club speed from OPS)
                 if shot.club_speed_mph:
-                    club_angle_h = kld7_horizontal.get_club_angle(club_speed_mph=shot.club_speed_mph)
+                    club_angle_h = state.kld7_horizontal.get_club_angle(
+                        club_speed_mph=shot.club_speed_mph,
+                    )
                     if club_angle_h and club_angle_h.horizontal_deg is not None:
                         shot.club_path_deg = club_angle_h.horizontal_deg
                         logger.info("[SERVER] Club path: %.1f° (conf=%.0f%%)",
                                      club_angle_h.horizontal_deg, club_angle_h.confidence * 100)
 
-                kld7_horizontal.reset()
+                state.kld7_horizontal.reset()
 
             # Derive spin axis from face angle (H. launch) minus club path
             if shot.launch_angle_horizontal is not None and shot.club_path_deg is not None:
@@ -1042,7 +1043,7 @@ def on_shot_detected(shot: Shot):
                 logger.info("[SERVER] Spin axis: %+.1f° (face=%+.1f° - path=%+.1f°)",
                              shot.spin_axis_deg, shot.launch_angle_horizontal, shot.club_path_deg)
 
-            if kld7_vertical or kld7_horizontal:
+            if state.kld7_vertical or state.kld7_horizontal:
                 kld7_ms = (time.time() - kld7_start) * 1000
                 logger.info("[SERVER] K-LD7 processing: %.1fms", kld7_ms)
     except Exception as e:
@@ -1053,8 +1054,13 @@ def on_shot_detected(shot: Shot):
     # Skip if K-LD7 already provided vertical angle
     camera_data = None
     try:
-        if camera_tracker and camera_enabled and shot.mode != "mock" and shot.launch_angle_vertical is None:
-            launch_angle = camera_tracker.calculate_launch_angle()
+        if (
+            state.camera_tracker
+            and state.camera_enabled
+            and shot.mode != "mock"
+            and shot.launch_angle_vertical is None
+        ):
+            launch_angle = state.camera_tracker.calculate_launch_angle()
             if launch_angle:
                 # Update shot object with launch angle data
                 shot.launch_angle_vertical = launch_angle.vertical
@@ -1067,7 +1073,7 @@ def on_shot_detected(shot: Shot):
                     "launch_angle_horizontal": launch_angle.horizontal,
                     "launch_angle_confidence": launch_angle.confidence,
                     "positions_tracked": len(launch_angle.positions),
-                    "launch_detected": camera_tracker.launch_detected,
+                    "launch_detected": state.camera_tracker.launch_detected,
                 }
                 logger.info(
                     "[SERVER] Angle source: camera (%.1f° V, %.1f° H, conf=%.0f%%)",
@@ -1077,9 +1083,9 @@ def on_shot_detected(shot: Shot):
                 )
 
             # Reset camera tracker for next shot
-            camera_tracker.reset()
-            ball_detected = False
-            ball_detection_confidence = 0.0
+            state.camera_tracker.reset()
+            state.ball_detected = False
+            state.ball_detection_confidence = 0.0
     except Exception as e:
         logger.warning("[SERVER] Camera processing error: %s", e, exc_info=True)
         camera_data = None
@@ -1156,7 +1162,7 @@ def on_shot_detected(shot: Shot):
     # Emit shot with launch angle data included
     try:
         shot_data = shot_to_dict(shot)
-        stats = monitor.get_session_stats() if monitor else {}
+        stats = state.monitor.get_session_stats() if state.monitor else {}
         socketio.emit("shot", {"shot": shot_data, "stats": stats})
 
         # Log shot info
@@ -1174,7 +1180,7 @@ def on_shot_detected(shot: Shot):
         return
 
     # Debug logging (optional)
-    if debug_mode:
+    if state.debug_mode:
         try:
             debug_log_entry = {
                 "type": "shot",
@@ -1189,9 +1195,9 @@ def on_shot_detected(shot: Shot):
                 "club": shot_data["club"],
             }
 
-            if debug_log_file:
-                debug_log_file.write(json.dumps(debug_log_entry) + "\n")
-                debug_log_file.flush()
+            if state.debug_log_file:
+                state.debug_log_file.write(json.dumps(debug_log_entry) + "\n")
+                state.debug_log_file.flush()
 
             socketio.emit("debug_shot", debug_log_entry)
         except Exception as e:
@@ -1215,21 +1221,19 @@ def start_monitor(
         trigger_type: Trigger strategy (sound, speed, polling)
         debug: Enable verbose debug output
     """
-    global monitor, mock_mode  # pylint: disable=global-statement
-
     # Stop any existing monitor first
-    if monitor is not None:
+    if state.monitor is not None:
         print("[MONITOR] Stopping existing monitor before starting new one")
         stop_monitor()
 
-    mock_mode = mock
+    state.mock_mode = mock
     if mock:
         # Mock mode for testing without radar
-        monitor = MockLaunchMonitor()
+        state.monitor = MockLaunchMonitor()
     else:
         from .rolling_buffer import RollingBufferMonitor
 
-        monitor = RollingBufferMonitor(
+        state.monitor = RollingBufferMonitor(
             port=port,
             trigger_type=trigger_type,
             sample_rate_ksps=sample_rate_ksps,
@@ -1239,7 +1243,7 @@ def start_monitor(
             f"[MODE] Rolling buffer mode (trigger: {trigger_type}, sample_rate: {sample_rate_ksps}ksps)"
         )
 
-    monitor.connect()
+    state.monitor.connect()
 
     logger.info("[SERVER] Starting monitor: mode=%s, trigger=%s, sample_rate=%dksps",
                 "mock" if mock else "rolling-buffer", trigger_type, sample_rate_ksps)
@@ -1247,13 +1251,17 @@ def start_monitor(
     # Start session logging
     session_logger = get_session_logger()
     if session_logger:
-        radar_info = monitor.get_radar_info() if not mock else {}
+        radar_info = state.monitor.get_radar_info() if not mock else {}
         session_logger.start_session(
             radar_port=port if not mock else "mock",
             firmware_version=radar_info.get("Version"),
-            camera_enabled=camera is not None,
-            camera_model="hough" if (camera_tracker and camera_tracker.use_hough) else None,
-            config=radar_config.copy(),
+            camera_enabled=state.camera is not None,
+            camera_model=(
+                "hough"
+                if (state.camera_tracker and state.camera_tracker.use_hough)
+                else None
+            ),
+            config=state.radar_config.copy(),
             mode="mock" if mock else "rolling-buffer",
             trigger_type=trigger_type if not mock else None,
         )
@@ -1261,7 +1269,11 @@ def start_monitor(
             session_logger.log_connection(
                 device="ops243",
                 port=port or "auto",
-                baud=getattr(monitor.radar, 'baud', 0) if hasattr(monitor, 'radar') else 0,
+                baud=(
+                    getattr(state.monitor.radar, 'baud', 0)
+                    if hasattr(state.monitor, 'radar')
+                    else 0
+                ),
                 firmware=radar_info.get("Version"),
             )
 
@@ -1271,28 +1283,26 @@ def start_monitor(
             """Forward trigger diagnostics to connected UI clients."""
             socketio.emit("trigger_diagnostic", data)
 
-        monitor.start(  # pylint: disable=unexpected-keyword-arg
+        state.monitor.start(  # pylint: disable=unexpected-keyword-arg
             shot_callback=on_shot_detected,
             live_callback=on_live_reading,
             diagnostic_callback=on_trigger_diagnostic,
         )
     else:
-        monitor.start(shot_callback=on_shot_detected, live_callback=on_live_reading)
+        state.monitor.start(shot_callback=on_shot_detected, live_callback=on_live_reading)
 
 
 def stop_monitor():
     """Stop the launch monitor."""
-    global monitor  # pylint: disable=global-statement
-
     # End session logging
     session_logger = get_session_logger()
     if session_logger:
         session_logger.end_session()
 
-    if monitor:
-        monitor.stop()
-        monitor.disconnect()
-        monitor = None
+    if state.monitor:
+        state.monitor.stop()
+        state.monitor.disconnect()
+        state.monitor = None
 
 
 class MockLaunchMonitor:
@@ -1714,14 +1724,14 @@ def main():
             app, host=args.host, port=args.web_port, debug=False, allow_unsafe_werkzeug=True
         )
     finally:
-        if kld7_vertical:
-            kld7_vertical.stop()
-        if kld7_horizontal:
-            kld7_horizontal.stop()
+        if state.kld7_vertical:
+            state.kld7_vertical.stop()
+        if state.kld7_horizontal:
+            state.kld7_horizontal.stop()
         stop_camera_thread()
-        if camera:
-            camera.stop()
-            camera.close()
+        if state.camera:
+            state.camera.stop()
+            state.camera.close()
         stop_monitor()
 
 
