@@ -14,10 +14,17 @@
 }
 
 /* Header */
+/*
+ * Header — wraps on narrow viewports so controls don't get clipped.
+ * On the kiosk (800px+) everything sits on a single row; on a phone
+ * portrait window the controls strip wraps below the logo.
+ */
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
   padding: var(--space-sm) var(--space-lg);
   background: linear-gradient(180deg, var(--color-bg-elevated) 0%, var(--color-bg-card) 100%);
   border-bottom: 1px solid rgba(212, 175, 55, 0.15);
@@ -33,7 +40,9 @@
 .header__controls {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-sm);
+  justify-content: flex-end;
 }
 
 .unit-toggle {
@@ -63,17 +72,39 @@
   color: var(--color-gold);
 }
 
-/* Navigation */
+/*
+ * Navigation — horizontally swipe-scrollable on narrow viewports, so
+ * the menu never crams all 5 buttons into too little space. On the
+ * kiosk and any wide viewport everything fits in a single flush row
+ * (flex: 1 shares the width); on a phone the buttons keep their
+ * minimum width and overflow horizontally with momentum scrolling.
+ *
+ * The scrollbar is hidden visually but the area is still keyboard- and
+ * touch-scrollable. Touch targets stay at 44px (WCAG 2.5.5).
+ */
 .nav {
   display: flex;
   gap: var(--space-sm);
   padding: var(--space-sm) var(--space-lg);
   background: var(--color-bg-card);
   flex-shrink: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none; /* Firefox */
+}
+
+.nav::-webkit-scrollbar {
+  display: none; /* Safari, Chrome */
 }
 
 .nav__button {
-  flex: 1;
+  /*
+   * `flex: 1 0 auto` so buttons share width when they fit, but never
+   * shrink below their content. On narrow viewports they keep
+   * comfortable size and the overflow scrolls horizontally.
+   */
+  flex: 1 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -92,6 +123,7 @@
   min-height: 42px;
   position: relative;
   overflow: hidden;
+  white-space: nowrap;
 }
 
 .nav__button::before {
@@ -142,11 +174,11 @@
 }
 
 .nav__button--recording {
-  border-color: rgba(248, 113, 113, 0.4);
+  border-color: var(--color-danger-border-strong);
 }
 
 .nav__button--streaming {
-  border-color: rgba(96, 165, 250, 0.4);
+  border-color: var(--color-info-tint);
 }
 
 .nav__recording-dot {
@@ -263,14 +295,14 @@
   border: none;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.08);
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .power-button:hover {
-  background: rgba(248, 113, 113, 0.2);
-  color: #f87171;
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
 }
 
 .shutdown-overlay {
@@ -294,7 +326,7 @@
 
 .shutdown-dialog p {
   font-size: 1.125rem;
-  color: var(--color-text);
+  color: var(--text-primary);
   margin: 0 0 1.5rem;
 }
 
@@ -308,15 +340,15 @@
   padding: 0.625rem 1.5rem;
   border: none;
   border-radius: 8px;
-  background: #dc2626;
-  color: white;
+  background: var(--color-danger-strong);
+  color: var(--color-cream);
   font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
 }
 
 .shutdown-dialog__confirm:active {
-  background: #b91c1c;
+  background: var(--color-danger-deep);
 }
 
 .shutdown-dialog__cancel {
@@ -324,7 +356,7 @@
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
   background: transparent;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 0.9375rem;
   cursor: pointer;
 }
@@ -358,8 +390,14 @@
   }
 
   .nav__button {
+    /*
+     * Touch target stays at 44px (WCAG 2.5.5) even on the 7" landscape
+     * kiosk — that's the primary form factor for this app, so it must
+     * meet the minimum. We compress the visual signature instead by
+     * shrinking padding + label size; the hit box stays generous.
+     */
     padding: var(--space-xs) var(--space-sm);
-    min-height: 38px;
+    min-height: 44px;
     font-size: 0.75rem;
   }
 
@@ -373,8 +411,9 @@
   }
 
   .simulate-button {
+    /* WCAG 2.5.5 minimum hit area held at 44px in landscape. */
     padding: var(--space-sm);
-    min-height: 40px;
+    min-height: 44px;
     font-size: 0.875rem;
   }
 }

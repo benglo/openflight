@@ -4,7 +4,22 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ui</title>
+    <!--
+      Fonts: preconnect to Google Fonts so the browser opens the
+      TLS connection in parallel with HTML parsing, then load the
+      stylesheet directly via <link>. Loading via @import in CSS
+      forces serial discovery (HTML -> CSS -> @import -> font CSS
+      -> font files) which is why we don't do that anymore.
+      `font-display: swap` is set inside the requested CSS so users
+      see fallback text instead of FOIT during the kiosk's cold start.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap"
+    />
+    <title>OpenFlight</title>
   </head>
   <body>
     <div id="root"></div>

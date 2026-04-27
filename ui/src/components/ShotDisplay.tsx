@@ -156,8 +156,14 @@ export function ShotDisplay({ shot, animate = false, simResult = null }: ShotDis
 
   if (!shot) {
     return (
-      <div className="shot-display shot-display--empty">
-        <div className="shot-display__waiting">
+      <section
+        className="shot-display shot-display--empty"
+        aria-labelledby="shot-display-heading"
+      >
+        <h2 id="shot-display-heading" className="visually-hidden">
+          Live shot — waiting for swing
+        </h2>
+        <div className="shot-display__waiting" aria-hidden="true">
           <div className="golf-ball-indicator">
             <div className="golf-ball-indicator__ball">
               <div className="golf-ball-indicator__dimple" />
@@ -169,7 +175,7 @@ export function ShotDisplay({ shot, animate = false, simResult = null }: ShotDis
           <p className="shot-display__waiting-text">Ready for your shot</p>
           <p className="shot-display__waiting-hint">Position ball in front of radar</p>
         </div>
-      </div>
+      </section>
     );
   }
 
@@ -177,7 +183,14 @@ export function ShotDisplay({ shot, animate = false, simResult = null }: ShotDis
   const hasLaunchAngle = shot.launch_angle_vertical !== null;
 
   return (
-    <div className={`shot-display ${animate ? 'shot-display--animate' : ''}`}>
+    <section
+      className={`shot-display ${animate ? 'shot-display--animate' : ''}`}
+      aria-labelledby="shot-display-heading"
+      aria-live="polite"
+    >
+      <h2 id="shot-display-heading" className="visually-hidden">
+        Live shot data
+      </h2>
       <div className="shot-display__layout">
         <div className="shot-display__primary">
           <SpeedGauge
@@ -301,6 +314,6 @@ export function ShotDisplay({ shot, animate = false, simResult = null }: ShotDis
           )}
         </div>
       </div>
-    </div>
+    </section>
   );
 }

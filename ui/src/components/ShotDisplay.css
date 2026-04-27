@@ -1,4 +1,11 @@
-/* Shot Display Container */
+/* Shot Display Container.
+ *
+ * overflow-y: auto lets the metric stack scroll on viewports too short
+ * to show every card (phone portrait, narrow desktop windows). On the
+ * kiosk and any tall viewport the content fits and no scrollbar appears.
+ * overflow-x stays hidden so the corner-accent ::before stays clipped
+ * to the rounded card boundary.
+ */
 .shot-display {
   background: linear-gradient(145deg, var(--color-bg-card) 0%, var(--color-bg-elevated) 100%);
   border: 1px solid rgba(212, 175, 55, 0.1);
@@ -10,6 +17,8 @@
   flex-direction: column;
   position: relative;
   overflow: hidden;
+  overflow-y: auto;
+  min-height: 0; /* allow the flex child to shrink so the scrollbar engages */
 }
 
 /* Subtle corner accent */
@@ -47,7 +56,13 @@
   }
 }
 
-/* Layout */
+/*
+ * Layout — side-by-side on the kiosk and any wide viewport (gauge
+ * left, metrics right), stacked on narrow viewports (phone portrait,
+ * narrow browser windows). Below 720px wide the gauge gets squished
+ * to ~165px and overflows onto its own metrics, so we stack vertically
+ * and give the gauge a comfortable max-width.
+ */
 .shot-display__layout {
   display: flex;
   gap: var(--space-md);
@@ -62,11 +77,51 @@
   justify-content: center;
 }
 
+@media (max-width: 720px) {
+  .shot-display__layout {
+    flex-direction: column;
+    gap: var(--space-lg);
+  }
+
+  .shot-display__primary,
+  .shot-display__metrics {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+
+  .speed-gauge {
+    max-width: 320px;
+    margin: 0 auto;
+  }
+}
+
+/*
+ * Right-side metrics grid. Primary cards (carry, sim carry) break out
+ * to span the full width of the grid so the layout reads as a rhythm
+ * of "here's an answer / here's its supporting context" rather than
+ * a wall of identical tiles. Spacing is also varied: tighter inside a
+ * group, looser between primaries and the cards below them, via the
+ * margin-top rule on the row that follows a primary.
+ */
 .shot-display__metrics {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--space-sm);
+  gap: var(--space-xs) var(--space-sm);
   flex: 1.2;
+  align-content: start;
+}
+
+/* Primary metric cards span the full grid — they ARE the answer, the
+   surrounding tertiary cards are context. */
+.shot-display__metrics > .metric-card--primary {
+  grid-column: 1 / -1;
+  margin-top: var(--space-xs);
+}
+
+/* First child shouldn't have the extra top space — it's the start
+   of the section, not a divider between groups. */
+.shot-display__metrics > .metric-card--primary:first-child {
+  margin-top: 0;
 }
 
 /* Speed Gauge */
@@ -89,11 +144,12 @@
   stroke-dashoffset: 0;
 }
 
-/* Animated: arc fills in from zero */
+/* Animated: arc fills in from zero. We don't promote with will-change
+   here — the animation is short (0.8s, runs once per shot) and not
+   worth holding a permanent compositor layer for. */
 .shot-display--animate .speed-gauge__value-arc {
-  animation: gauge-fill 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  animation: gauge-fill 0.8s var(--ease-out-quint) forwards;
   stroke-dashoffset: 1000;
-  will-change: stroke-dashoffset;
 }
 
 @keyframes gauge-fill {
@@ -113,19 +169,23 @@
   align-items: center;
 }
 
-/* Default: value fully visible, no animation */
+/* Hero readout — the one true primary number on this screen. We keep
+   a tight 6px halo on the gauge value (and only here) — it's the one
+   moment of "instrument luminescence" we afford. The wider 30px halo
+   we used before bled the digits into the background and hurt
+   legibility at distance on the kiosk. */
 .speed-gauge__value {
   font-family: var(--font-display);
-  font-size: 5rem;
+  font-size: var(--text-display-hero);
   font-weight: 400;
   color: var(--color-gold);
   line-height: 1;
-  text-shadow: 0 0 30px var(--color-gold-glow);
+  text-shadow: 0 0 6px var(--color-gold-glow);
 }
 
 /* Animated: value pops in */
 .shot-display--animate .speed-gauge__value {
-  animation: value-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both;
+  animation: value-pop 0.4s var(--ease-out-quint) 0.2s both;
 }
 
 @keyframes value-pop {
@@ -178,18 +238,17 @@
 }
 
 .metric-card--secondary {
-  background: rgba(96, 165, 250, 0.05);
-  border-color: rgba(96, 165, 250, 0.15);
+  background: var(--color-info-bg);
+  border-color: var(--color-info-border);
 }
 
 .metric-card--spin {
-  background: rgba(168, 85, 247, 0.08);
-  border-color: rgba(168, 85, 247, 0.25);
+  background: var(--color-spin-bg);
+  border-color: var(--color-spin-border);
 }
 
 .metric-card--spin .metric-card__value {
-  color: #c084fc;
-  text-shadow: 0 0 15px rgba(168, 85, 247, 0.4);
+  color: var(--color-spin-bright);
 }
 
 .metric-card__value-row {
@@ -198,10 +257,14 @@
   gap: 4px;
 }
 
-/* Default: metric value fully visible, no animation */
+/*
+ * Tertiary readout (default). Most metric cards land here — club speed,
+ * launch angles, sim total/lateral/apex, etc. They support the hero;
+ * they don't compete with it.
+ */
 .metric-card__value {
   font-family: var(--font-display);
-  font-size: 5rem;
+  font-size: var(--text-display-tertiary);
   font-weight: 400;
   line-height: 1;
   color: var(--color-cream);
@@ -209,12 +272,18 @@
 
 /* Animated: metric value pops in */
 .shot-display--animate .metric-card__value {
-  animation: value-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both;
+  animation: value-pop 0.4s var(--ease-out-quint) 0.3s both;
 }
 
+/*
+ * Primary cards (carry, sim carry) — the "answer" numbers. One step
+ * below the hero gauge, one step above the supporting metrics. Color
+ * + size do the work; we don't add a halo here, since glow on smaller
+ * digits dilutes legibility more than it adds emphasis.
+ */
 .metric-card--primary .metric-card__value {
+  font-size: var(--text-display-primary);
   color: var(--color-gold);
-  text-shadow: 0 0 20px var(--color-gold-glow);
 }
 
 .metric-card--secondary .metric-card__value {
@@ -228,7 +297,7 @@
 }
 
 .metric-card__label {
-  font-size: 1rem;
+  font-size: var(--text-label);
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -236,8 +305,10 @@
   margin-top: 6px;
 }
 
+/* Held at the 12px legibility floor — anything smaller stops being
+   real text and becomes decoration. */
 .metric-card__subtext {
-  font-size: 0.5625rem;
+  font-size: var(--text-caption);
   color: var(--text-muted);
   margin-top: 2px;
   opacity: 0.7;
@@ -260,17 +331,17 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: rgba(168, 85, 247, 0.2);
+  background: var(--color-spin-dot-idle);
   transition: all 0.3s ease;
 }
 
 .metric-card__confidence-dots .dot.filled {
-  background: #c084fc;
-  box-shadow: 0 0 6px rgba(168, 85, 247, 0.5);
+  background: var(--color-spin-bright);
+  box-shadow: 0 0 6px var(--color-spin-dot-active-glow);
 }
 
 .metric-card__confidence-label {
-  font-size: 0.5625rem;
+  font-size: var(--text-caption);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -278,11 +349,11 @@
 }
 
 .metric-card__confidence--high .metric-card__confidence-label {
-  color: #a855f7;
+  color: var(--color-spin);
 }
 
 .metric-card__confidence--medium .metric-card__confidence-label {
-  color: #c084fc;
+  color: var(--color-spin-bright);
 }
 
 .metric-card__confidence--low .metric-card__confidence-label {
@@ -317,7 +388,15 @@
   margin: 0;
 }
 
-/* Golf Ball Indicator */
+/*
+ * Golf Ball Indicator — only mounted in the empty waiting-state
+ * (ShotDisplay returns this branch when shot === null), so the
+ * infinite ball-breathe / shadow-breathe animations below are
+ * automatically scoped to "no shot detected yet" and stop running
+ * as soon as a real shot lands. Don't try to gate them in CSS too;
+ * it'd be redundant and the prefers-reduced-motion override in
+ * index.css already collapses them for users with vestibular needs.
+ */
 .golf-ball-indicator {
   position: relative;
   width: 60px;
@@ -401,7 +480,14 @@
   }
 }
 
-/* Landscape 7" screen (800x480) */
+/*
+ * Landscape 7" screen (800x480).
+ *
+ * Numeric values shrink so the metric grid fits at high density, but
+ * label/caption text holds at 0.75rem (12px) — the legibility floor.
+ * If something doesn't fit, the right answer is to render less, not
+ * to render unreadable.
+ */
 @media (max-height: 500px) {
   .shot-display {
     padding: var(--space-xs) var(--space-sm);
@@ -422,38 +508,48 @@
     max-width: 220px;
   }
 
-  .speed-gauge__value {
-    font-size: 3.5rem;
-  }
-
+  /*
+   * On the kiosk, hero stays big — the gauge is read at distance and
+   * needs to dominate. The clamp() in the default rule already lets it
+   * scale on the 800px viewport (12vw = 96px = 6rem cap), so we don't
+   * need a landscape override for the gauge value itself.
+   */
   .speed-gauge__unit {
-    font-size: 0.875rem;
+    font-size: var(--text-label);
   }
 
   .speed-gauge__label {
-    font-size: 0.6875rem;
+    font-size: var(--text-label-small);
   }
 
   .metric-card {
-    padding: 0.125rem var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
     min-height: 0;
   }
 
+  /* Numbers stay big enough to read at distance. The HIERARCHY (primary
+     ~1.5x larger than tertiary) is what creates the visual structure,
+     not absolute smallness. */
   .metric-card__value {
-    font-size: 1.75rem;
+    font-size: 2rem;
+  }
+
+  .metric-card--primary .metric-card__value {
+    font-size: 3rem;
   }
 
   .metric-card__unit {
-    font-size: 0.8rem;
+    font-size: var(--text-label-small);
   }
 
+  /* Hold at the 12px floor in landscape too — see comment block above. */
   .metric-card__label {
-    font-size: 0.5625rem;
+    font-size: var(--text-label-small);
     margin-top: 2px;
   }
 
   .metric-card__subtext {
-    font-size: 0.5rem;
+    font-size: var(--text-caption);
     margin-top: 1px;
   }
 
@@ -468,7 +564,7 @@
   }
 
   .metric-card__confidence-label {
-    font-size: 0.5rem;
+    font-size: var(--text-caption);
   }
 
   .shot-display__waiting-text {
@@ -476,7 +572,7 @@
   }
 
   .shot-display__waiting-hint {
-    font-size: 0.75rem;
+    font-size: var(--text-caption);
   }
 
   .golf-ball-indicator {

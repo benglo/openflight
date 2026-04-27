@@ -1,9 +1,12 @@
-/* Stats View */
+/* Stats View — internal vertical scroll for tall content on narrow
+   viewports (many shots → many club tabs + a tall stats grid). */
 .stats-view {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
   height: 100%;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .stats-view--empty {
@@ -22,6 +25,7 @@
 }
 
 .club-tabs__tab {
+  position: relative;
   padding: var(--space-sm) var(--space-md);
   background: transparent;
   border: 1px solid rgba(245, 240, 230, 0.1);
@@ -36,6 +40,24 @@
   touch-action: manipulation;
 }
 
+/*
+ * Active state uses three signals — color, weight, AND a baseline
+ * underline — so that color-blind users and high-contrast / forced-colors
+ * users still see the selection. Color alone fails WCAG 1.4.1.
+ */
+.club-tabs__tab::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  transform: translateX(-50%) scaleX(0);
+  width: 60%;
+  height: 2px;
+  background: var(--color-gold);
+  border-radius: 2px;
+  transition: transform var(--transition-smooth);
+}
+
 .club-tabs__tab:active {
   transform: scale(0.95);
 }
@@ -44,19 +66,57 @@
   background: rgba(212, 175, 55, 0.1);
   border-color: rgba(212, 175, 55, 0.4);
   color: var(--color-gold);
+  font-weight: 700;
 }
 
-/* Stats Grid */
+.club-tabs__tab--active::after {
+  transform: translateX(-50%) scaleX(1);
+}
+
+/*
+ * Stats Grid — broken from the symmetric repeat(3, 1fr) pattern.
+ * Avg Carry is the hero card that spans all 3 columns at the top;
+ * supporting cards fill the rows below in a normal 3-col rhythm.
+ * Spacing is varied: a generous gap separates the hero from its
+ * context strip, tighter gaps within the strip itself.
+ */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: var(--space-sm);
   flex: 1;
+  margin: 0;
 }
 
+/*
+ * The single primary card spans the full row width and gets a
+ * generous bottom space — that's the rhythm break: hero / GAP /
+ * supporting strip.
+ */
+.stats-grid > .stat-card--primary {
+  grid-column: 1 / -1;
+  margin-bottom: var(--space-sm);
+  padding: var(--space-lg) var(--space-md);
+}
+
+/* Drop to 2 columns on narrow viewports so the supporting cards keep
+   readable width. Hero card already uses grid-column: 1 / -1 so it
+   adapts automatically. */
+@media (max-width: 600px) {
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/*
+ * Stat cards are <div><dt><dd> after the semantic refactor. We render
+ * the value above the label visually (the original design intent),
+ * but keep dt-then-dd in DOM order for screen readers, via
+ * flex-direction: column-reverse.
+ */
 .stat-card {
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
   align-items: center;
   justify-content: center;
   padding: var(--space-md);
@@ -65,6 +125,7 @@
   border-radius: var(--radius-md);
   text-align: center;
   transition: all var(--transition-smooth);
+  margin: 0; /* reset <div> ancestor's <dl> default margins */
 }
 
 .stat-card--primary {
@@ -72,21 +133,29 @@
   border-color: rgba(212, 175, 55, 0.2);
 }
 
+/*
+ * Stat card values use the stat-tier of the type scale (smaller than
+ * the Live screen's hero/primary tiers, since stats cards are dense
+ * and there's no single "answer" — they're a uniform readout).
+ * Primary cards step up by ~25% so Avg Ball / Avg Carry catch the eye.
+ */
 .stat-card__value {
   font-family: var(--font-display);
-  font-size: 2rem;
+  font-size: var(--text-display-stat-secondary);
   font-weight: 400;
   color: var(--color-cream);
   line-height: 1;
+  margin: 0; /* reset <dd> default margin-inline-start: 40px */
 }
 
 .stat-card--primary .stat-card__value {
+  font-size: var(--text-display-stat-primary);
   color: var(--color-gold);
-  text-shadow: 0 0 20px var(--color-gold-glow);
 }
 
+/* Held at the 12px legibility floor. */
 .stat-card__label {
-  font-size: 0.625rem;
+  font-size: var(--text-label-small);
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -99,7 +168,7 @@
   width: 100%;
   padding: var(--space-md);
   background: transparent;
-  border: 1px solid rgba(248, 113, 113, 0.3);
+  border: 1px solid var(--color-danger-border);
   border-radius: var(--radius-md);
   color: var(--color-danger);
   font-size: 0.875rem;
@@ -113,7 +182,7 @@
 
 .clear-button:active {
   transform: scale(0.98);
-  background: rgba(248, 113, 113, 0.1);
+  background: var(--color-danger-bg);
 }
 
 /* Responsive for 7" screen */
@@ -123,8 +192,9 @@
   }
 
   .club-tabs__tab {
+    /* WCAG 2.5.5 minimum hit area held at 44px even in landscape. */
     padding: var(--space-xs) var(--space-sm);
-    min-height: 36px;
+    min-height: 44px;
     font-size: 0.75rem;
   }
 
@@ -136,12 +206,19 @@
     padding: var(--space-sm);
   }
 
+  /* Stay big enough to read across the room — kiosk-first sizing.
+     Primary ~1.5x secondary maintains the hierarchy. */
   .stat-card__value {
-    font-size: 1.5rem;
+    font-size: 2rem;
   }
 
+  .stat-card--primary .stat-card__value {
+    font-size: 3rem;
+  }
+
+  /* Hold at 12px floor — see typography note in default block. */
   .stat-card__label {
-    font-size: 0.5625rem;
+    font-size: var(--text-label-small);
   }
 
   .clear-button {

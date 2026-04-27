@@ -1,37 +1,112 @@
-/* OpenFlight - Premium Golf Tech Design System */
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@300;400;500;600;700&display=swap');
+/*
+ * OpenFlight - Premium Golf Tech Design System
+ *
+ * Fonts (DM Serif Display + Outfit) are loaded via <link rel="stylesheet">
+ * in ui/index.html so the browser can preconnect and parallelize fetches.
+ * Don't add @import here — it serializes the loading waterfall.
+ */
 
 * {
   box-sizing: border-box;
 }
 
 :root {
-  /* Typography */
+  /*
+   * Typography
+   *
+   * Display: DM Serif Display — high-contrast didone-influenced serif.
+   *   Carries the "premium / instrument" tone for hero numbers without
+   *   leaning on glow effects. Used for all numeric readouts.
+   *
+   * Body: IBM Plex Sans — chosen over the more common Outfit / Inter
+   *   because it has actual character (the slightly canted lowercase
+   *   letters, the open `a`, the engineered feel) which fits a launch
+   *   monitor / measurement instrument better than the ubiquitous
+   *   geometric grotesks. Free, available in 7 weights, on Google Fonts.
+   */
   --font-display: 'DM Serif Display', Georgia, serif;
-  --font-body: 'Outfit', system-ui, -apple-system, sans-serif;
+  --font-body: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
 
-  /* Color Palette - Premium Golf */
-  --color-bg-deep: #0a0a0f;
-  --color-bg-card: #12121a;
-  --color-bg-elevated: #1a1a24;
-  --color-bg-hover: #222230;
+  /*
+   * Type scale — modular and intentional.
+   *
+   * Numeric readouts use a 1.5x ratio (5 → 3 → 2 rem) so each tier is
+   * unambiguously different at a glance. The audit found everything
+   * was `5rem`, which made the eye scan everywhere; this scale gives
+   * the user a single hero and a single secondary on each screen.
+   *
+   * Hero is fluid via clamp() so it adapts gracefully when the UI is
+   * loaded in a dev browser; on the 800px kiosk it locks at 5rem.
+   * Other tiers are fixed because predictability matters more than
+   * fluidity at app-UI density.
+   */
+  /*
+   * Sizes calibrated for a 7-10" landscape touchscreen viewed from
+   * standing distance. Big values are the point of a launch monitor —
+   * the hero number must be readable across the room. Hierarchy is
+   * driven by the *ratio* between tiers (~1.5x), not by shrinking.
+   * On 800px-wide kiosk: hero ≈ 96px, primary ≈ 64px, tertiary ≈ 40px.
+   */
+  --text-display-hero: clamp(4rem, 12vw, 6rem);  /* speed gauge — the hero */
+  --text-display-primary: 4rem;                  /* answer numbers (carry) */
+  --text-display-tertiary: 2.5rem;               /* supporting metrics */
+  --text-display-stat-primary: 3.5rem;           /* hero stat (avg carry) */
+  --text-display-stat-secondary: 2.5rem;         /* supporting stats */
 
-  /* Gold accent (primary) */
+  --text-label: 0.875rem;          /* 14px — comfortable label baseline */
+  --text-label-small: 0.75rem;     /* 12px — minimum legible label */
+  --text-caption: 0.75rem;         /* 12px — minimum supporting text */
+
+  /*
+   * Backgrounds — warmed from the previous near-black blue-violet to a
+   * very low-chroma gold-hue dark. The neutrals now share the brand's
+   * hue (≈80°) at vanishing chroma, so cards and the gold accent are
+   * subtly cohesive instead of feeling stuck on a cool slate.
+   */
+  --color-bg-deep: oklch(0.06 0.01 80);
+  --color-bg-card: oklch(0.105 0.012 80);
+  --color-bg-elevated: oklch(0.14 0.014 80);
+  --color-bg-hover: oklch(0.185 0.016 80);
+
+  /* Gold accent (primary brand) */
   --color-gold: #d4af37;
   --color-gold-bright: #f4cf47;
   --color-gold-dim: #a68b2a;
   --color-gold-glow: rgba(212, 175, 55, 0.4);
 
-  /* Cream/ivory (secondary) */
+  /* Cream/ivory (text on dark) */
   --color-cream: #f5f0e6;
   --color-cream-dim: rgba(245, 240, 230, 0.7);
   --color-cream-muted: rgba(245, 240, 230, 0.5);
 
-  /* Accent colors */
+  /* Semantic accents — base hex */
   --color-success: #4ade80;
   --color-info: #60a5fa;
   --color-warning: #fbbf24;
   --color-danger: #f87171;
+  --color-spin: #a855f7;
+  --color-spin-bright: #c084fc;
+  --color-danger-strong: #dc2626;
+  --color-danger-deep: #b91c1c;
+
+  /*
+   * Tinted variants for backgrounds, borders, and glows. Defined as
+   * tokens so the same color family can be themed in one place rather
+   * than scattered as `rgba(...)` literals across components.
+   */
+  --color-info-bg: rgba(96, 165, 250, 0.05);
+  --color-info-border: rgba(96, 165, 250, 0.15);
+  --color-info-tint: rgba(96, 165, 250, 0.4);
+
+  --color-spin-bg: rgba(168, 85, 247, 0.08);
+  --color-spin-border: rgba(168, 85, 247, 0.25);
+  --color-spin-glow: rgba(168, 85, 247, 0.4);
+  --color-spin-dot-idle: rgba(168, 85, 247, 0.2);
+  --color-spin-dot-active-glow: rgba(168, 85, 247, 0.5);
+
+  --color-danger-bg: rgba(248, 113, 113, 0.1);
+  --color-danger-border: rgba(248, 113, 113, 0.3);
+  --color-danger-border-strong: rgba(248, 113, 113, 0.4);
 
   /* Text */
   --text-primary: var(--color-cream);
@@ -55,10 +130,19 @@
   --shadow-glow: 0 0 20px var(--color-gold-glow);
   --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.4);
 
-  /* Transitions */
+  /*
+   * Transitions / easing.
+   *
+   * No bounce/elastic curves — they read as "playful toy" rather
+   * than "precision instrument." For things that should feel like
+   * they decelerate naturally (a needle settling, a value landing)
+   * we use ease-out-quint, which is exponential ease-out. Real
+   * objects decelerate this way; bouncy curves do not.
+   */
   --transition-fast: 0.15s ease;
   --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-spring: 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition-spring: 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quint: cubic-bezier(0.16, 1, 0.3, 1);
 
   /* Base styles */
   line-height: 1.4;
@@ -70,6 +154,29 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/*
+ * Baseline light mode. The kiosk runs dark by default; this branch
+ * just keeps the system honest for outdoor / sunlight viewing and
+ * for users with `prefers-color-scheme: light`. We invert the
+ * neutral lightness scale and the cream tones; semantic accents
+ * (gold, info, spin, danger) are unchanged because they read on
+ * both grounds.
+ */
+@media (prefers-color-scheme: light) {
+  :root {
+    --color-bg-deep: oklch(0.98 0.005 80);
+    --color-bg-card: oklch(0.955 0.007 80);
+    --color-bg-elevated: oklch(0.93 0.009 80);
+    --color-bg-hover: oklch(0.90 0.012 80);
+
+    --color-cream: oklch(0.18 0.01 80);
+    --color-cream-dim: oklch(0.38 0.01 80);
+    --color-cream-muted: oklch(0.55 0.01 80);
+
+    color-scheme: light;
+  }
 }
 
 body {
@@ -125,4 +232,38 @@ button {
 :focus-visible {
   outline: 2px solid var(--color-gold);
   outline-offset: 2px;
+}
+
+/*
+ * Visually hide content while keeping it available to screen readers.
+ * Use this on headings that structure the page for assistive tech but
+ * would clutter the visual design.
+ */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/*
+ * Honor the user's motion preference. We have several attention-grabbing
+ * animations (gauge fill, value pop, ball-breathe, shot-glow, pulse-*)
+ * that are pleasant for most users but actively distressing for users
+ * with vestibular disorders. Collapse all of them to a single frame.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
