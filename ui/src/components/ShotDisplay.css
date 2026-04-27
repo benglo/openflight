@@ -89,11 +89,12 @@
   stroke-dashoffset: 0;
 }
 
-/* Animated: arc fills in from zero */
+/* Animated: arc fills in from zero. We don't promote with will-change
+   here — the animation is short (0.8s, runs once per shot) and not
+   worth holding a permanent compositor layer for. */
 .shot-display--animate .speed-gauge__value-arc {
   animation: gauge-fill 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   stroke-dashoffset: 1000;
-  will-change: stroke-dashoffset;
 }
 
 @keyframes gauge-fill {
@@ -317,7 +318,15 @@
   margin: 0;
 }
 
-/* Golf Ball Indicator */
+/*
+ * Golf Ball Indicator — only mounted in the empty waiting-state
+ * (ShotDisplay returns this branch when shot === null), so the
+ * infinite ball-breathe / shadow-breathe animations below are
+ * automatically scoped to "no shot detected yet" and stop running
+ * as soon as a real shot lands. Don't try to gate them in CSS too;
+ * it'd be redundant and the prefers-reduced-motion override in
+ * index.css already collapses them for users with vestibular needs.
+ */
 .golf-ball-indicator {
   position: relative;
   width: 60px;

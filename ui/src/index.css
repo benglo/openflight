@@ -1,5 +1,10 @@
-/* OpenFlight - Premium Golf Tech Design System */
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@300;400;500;600;700&display=swap');
+/*
+ * OpenFlight - Premium Golf Tech Design System
+ *
+ * Fonts (DM Serif Display + Outfit) are loaded via <link rel="stylesheet">
+ * in ui/index.html so the browser can preconnect and parallelize fetches.
+ * Don't add @import here — it serializes the loading waterfall.
+ */
 
 * {
   box-sizing: border-box;
