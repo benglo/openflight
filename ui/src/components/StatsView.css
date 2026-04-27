@@ -74,41 +74,6 @@
 }
 
 /*
- * Stats Grid — broken from the symmetric repeat(3, 1fr) pattern.
- * Avg Carry is the hero card that spans all 3 columns at the top;
- * supporting cards fill the rows below in a normal 3-col rhythm.
- * Spacing is varied: a generous gap separates the hero from its
- * context strip, tighter gaps within the strip itself.
- */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-sm);
-  flex: 1;
-  margin: 0;
-}
-
-/*
- * The single primary card spans the full row width and gets a
- * generous bottom space — that's the rhythm break: hero / GAP /
- * supporting strip.
- */
-.stats-grid > .stat-card--primary {
-  grid-column: 1 / -1;
-  margin-bottom: var(--space-sm);
-  padding: var(--space-lg) var(--space-md);
-}
-
-/* Drop to 2 columns on narrow viewports so the supporting cards keep
-   readable width. Hero card already uses grid-column: 1 / -1 so it
-   adapts automatically. */
-@media (max-width: 600px) {
-  .stats-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-/*
  * Stat cards are <div><dt><dd> after the semantic refactor. We render
  * the value above the label visually (the original design intent),
  * but keep dt-then-dd in DOM order for screen readers, via
@@ -196,10 +161,6 @@
     padding: var(--space-xs) var(--space-sm);
     min-height: 44px;
     font-size: 0.75rem;
-  }
-
-  .stats-grid {
-    gap: var(--space-xs);
   }
 
   .stat-card {

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, type ReactElement } from 'react';
+import { useCallback, useMemo, useState, type ReactElement } from 'react';
 // react-grid-layout v1 attaches Responsive + WidthProvider as members
 // of the default export. esModuleInterop bridges the CJS module so
 // named imports work at the source level.
@@ -29,6 +29,9 @@ const ResponsiveGridLayout = WidthProvider(Responsive);
 const BREAKPOINTS = { kiosk: 720, tablet: 600, phone: 0 } as const;
 const COLS = { kiosk: 12, tablet: 8, phone: 4 } as const;
 
+// Single bottom-right corner handle — the conventional resize affordance.
+const RESIZE_HANDLES: ('se')[] = ['se'];
+
 interface EditableDashboardProps {
   view: DashboardKey;
   /**
@@ -39,20 +42,24 @@ interface EditableDashboardProps {
    */
   cardIds: readonly string[];
   /**
+   * Friendly label per card id. Used by the "Add Cards" drawer when
+   * listing hidden cards. Falls back to the raw id if missing.
+   */
+  cardLabels?: Record<string, string>;
+  /**
    * The cards themselves. Each child must have a `key` prop matching
    * one of `cardIds`. Children whose key isn't in cardIds are dropped.
    */
   children: ReactElement[] | ReactElement;
-  /** Optional class on the outer container for view-mode styling parity. */
-  className?: string;
 }
 
 /**
- * Wraps a section of cards so that, in edit mode, they become draggable
- * + resizable widgets via react-grid-layout. In view mode the wrapper
- * renders a plain container with the supplied `className`, so today's
- * CSS-grid styling continues to drive the layout exactly as before —
- * users see no difference until they hit the edit toggle.
+ * Wraps a section of cards in a react-grid-layout grid. The layout is
+ * the same in view and edit mode — only edit mode adds drag/resize,
+ * the dashed outlines, the per-card hide button, the reset button, and
+ * the "Add Cards" drawer. View mode renders the exact same RGL positions
+ * read-only, so changes the user makes in edit mode are visible the
+ * moment they exit.
  *
  * Layout persistence + reconciliation lives in `useDashboardLayouts`;
  * this component is purely the rendering boundary.
@@ -60,11 +67,19 @@ interface EditableDashboardProps {
 export function EditableDashboard({
   view,
   cardIds,
+  cardLabels,
   children,
-  className,
 }: EditableDashboardProps) {
   const { editMode } = useEditMode();
-  const { layouts, setLayouts, reset } = useDashboardLayouts(view, cardIds);
+  const { layouts, setLayouts, reset, hidden, hide, show } =
+    useDashboardLayouts(view, cardIds);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  // Drawer visibility derives from edit mode so leaving edit mode hides
+  // the drawer without us having to write an effect that resets state
+  // (the lint rule rightly flags such effects). The internal `drawerOpen`
+  // state is preserved across edit-mode toggles, which is fine — the
+  // drawer is a transient affordance, not load-bearing UI.
+  const drawerVisible = editMode && drawerOpen;
 
   const handleReset = useCallback(() => {
     if (typeof window !== 'undefined' && window.confirm) {
@@ -74,15 +89,18 @@ export function EditableDashboard({
     reset();
   }, [reset]);
 
-  // Filter children to only those whose key is in cardIds. Defensive —
-  // protects against a child being rendered without a corresponding
-  // entry in the layout (which would otherwise be unmounted by RGL on
-  // first interaction).
+  // Hidden ids are dropped before children render; the parent always
+  // emits the full set, but RGL never sees the hidden ones.
+  const hiddenSet = useMemo(() => new Set(hidden), [hidden]);
+  const visibleIdSet = useMemo(
+    () => new Set(cardIds.filter((id) => !hiddenSet.has(id))),
+    [cardIds, hiddenSet],
+  );
+
   const childArray = Array.isArray(children) ? children : [children];
-  const knownIds = useMemo(() => new Set(cardIds), [cardIds]);
   const renderableChildren = childArray.filter((child) => {
     const key = child.key;
-    return key !== null && key !== undefined && knownIds.has(String(key));
+    return key !== null && key !== undefined && visibleIdSet.has(String(key));
   });
 
   const onLayoutChange = useCallback(
@@ -100,23 +118,10 @@ export function EditableDashboard({
     [layouts, setLayouts],
   );
 
-  if (!editMode) {
-    // View mode: keep today's exact layout. RGL is bypassed entirely so
-    // the audited CSS grid styling continues to drive placement.
-    return <div className={className}>{renderableChildren}</div>;
-  }
-
-  /*
-   * Edit mode: deliberately do NOT pass the caller's className through.
-   * The shot-display / stats-view CSS classes carry their own
-   * `display: grid; grid-template-columns: ...` rules — those compete
-   * with react-grid-layout's absolute-positioned children and result in
-   * cards stacking in a single column instead of using the full grid.
-   * The `.editable-dashboard--editing` class supplies the sizing
-   * (width: 100%, flex: 1) we actually need.
-   */
   return (
-    <div className="editable-dashboard editable-dashboard--editing">
+    <div
+      className={`editable-dashboard${editMode ? ' editable-dashboard--editing' : ''}`}
+    >
       <ResponsiveGridLayout
         className="editable-dashboard__grid"
         layouts={layouts as unknown as Layouts}
@@ -125,27 +130,111 @@ export function EditableDashboard({
         rowHeight={40}
         margin={[8, 8]}
         containerPadding={[0, 0]}
-        isDraggable
-        isResizable
+        isDraggable={editMode}
+        isResizable={editMode}
+        resizeHandles={RESIZE_HANDLES}
         compactType="vertical"
         preventCollision={false}
         onLayoutChange={onLayoutChange}
         draggableCancel="input,textarea,button,a"
       >
-        {renderableChildren.map((child) => (
-          <div key={child.key} className="editable-dashboard__widget">
-            {child}
-          </div>
-        ))}
+        {renderableChildren.map((child) => {
+          const id = String(child.key);
+          return (
+            <div key={id} className="editable-dashboard__widget">
+              {/*
+               * Inner wrapper exists so the metric / stat card can fill
+               * the RGL grid cell without us also stretching the resize
+               * handle (RGL renders the handle as a sibling of this div).
+               */}
+              <div className="editable-dashboard__widget-content">{child}</div>
+              {editMode && (
+                <button
+                  type="button"
+                  className="editable-dashboard__hide-btn"
+                  aria-label={`Hide ${cardLabels?.[id] ?? id}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    hide(id);
+                  }}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          );
+        })}
       </ResponsiveGridLayout>
-      <button
-        type="button"
-        className="editable-dashboard__reset"
-        onClick={handleReset}
-        aria-label="Reset dashboard layout to defaults"
-      >
-        Reset Layout
-      </button>
+      {editMode && (
+        <div className="editable-dashboard__toolbar">
+          <button
+            type="button"
+            className="editable-dashboard__reset"
+            onClick={handleReset}
+            aria-label="Reset dashboard layout to defaults"
+          >
+            Reset Layout
+          </button>
+          <button
+            type="button"
+            className="editable-dashboard__add-btn"
+            onClick={() => setDrawerOpen(true)}
+            disabled={hidden.length === 0}
+            aria-label="Add hidden cards back to the dashboard"
+          >
+            Add Cards ({hidden.length})
+          </button>
+        </div>
+      )}
+      {drawerVisible && (
+        <>
+          <div
+            className="editable-dashboard__drawer-backdrop"
+            onClick={() => setDrawerOpen(false)}
+            aria-hidden="true"
+          />
+          <aside
+            className="editable-dashboard__drawer"
+            role="dialog"
+            aria-label="Hidden cards"
+          >
+            <header className="editable-dashboard__drawer-header">
+              <h3>Hidden cards</h3>
+              <button
+                type="button"
+                className="editable-dashboard__drawer-close"
+                onClick={() => setDrawerOpen(false)}
+                aria-label="Close hidden cards drawer"
+              >
+                ×
+              </button>
+            </header>
+            {hidden.length === 0 ? (
+              <p className="editable-dashboard__drawer-empty">
+                Every card is currently visible.
+              </p>
+            ) : (
+              <ul className="editable-dashboard__drawer-list">
+                {hidden.map((id) => (
+                  <li key={id} className="editable-dashboard__drawer-item">
+                    <span className="editable-dashboard__drawer-label">
+                      {cardLabels?.[id] ?? id}
+                    </span>
+                    <button
+                      type="button"
+                      className="editable-dashboard__drawer-add"
+                      onClick={() => show(id)}
+                      aria-label={`Add ${cardLabels?.[id] ?? id} back to the dashboard`}
+                    >
+                      + Add
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </aside>
+        </>
+      )}
     </div>
   );
 }

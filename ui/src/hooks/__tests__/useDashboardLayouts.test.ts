@@ -34,7 +34,10 @@ describe('useDashboardLayouts', () => {
     });
     const stored = JSON.parse(localStorage.getItem('openflight.dashboard.v1') || '{}');
     expect(stored.version).toBe(SCHEMA_VERSION);
-    expect(stored.live.kiosk).toEqual([{ i: 'carry', x: 0, y: 0, w: 4, h: 2 }]);
+    expect(stored.live.layouts.kiosk).toEqual([
+      { i: 'carry', x: 0, y: 0, w: 4, h: 2 },
+    ]);
+    expect(stored.live.hidden).toEqual([]);
     expect(result.current.usingDefault).toBe(false);
   });
 
@@ -97,9 +100,12 @@ describe('useDashboardLayouts', () => {
       JSON.stringify({
         version: SCHEMA_VERSION,
         live: {
-          kiosk: [{ i: 'known', x: 0, y: 0, w: 4, h: 2 }],
-          tablet: [],
-          phone: [],
+          layouts: {
+            kiosk: [{ i: 'known', x: 0, y: 0, w: 4, h: 2 }],
+            tablet: [],
+            phone: [],
+          },
+          hidden: [],
         },
       }),
     );
@@ -117,12 +123,15 @@ describe('useDashboardLayouts', () => {
       JSON.stringify({
         version: SCHEMA_VERSION,
         live: {
-          kiosk: [
-            { i: 'still_here', x: 0, y: 0, w: 4, h: 2 },
-            { i: 'removed_from_code', x: 4, y: 0, w: 2, h: 2 },
-          ],
-          tablet: [],
-          phone: [],
+          layouts: {
+            kiosk: [
+              { i: 'still_here', x: 0, y: 0, w: 4, h: 2 },
+              { i: 'removed_from_code', x: 4, y: 0, w: 2, h: 2 },
+            ],
+            tablet: [],
+            phone: [],
+          },
+          hidden: [],
         },
       }),
     );
@@ -132,5 +141,70 @@ describe('useDashboardLayouts', () => {
     const ids = result.current.layouts.kiosk.map((item) => item.i);
     expect(ids).toContain('still_here');
     expect(ids).not.toContain('removed_from_code');
+  });
+
+  it('hide() removes the card from every breakpoint layout and adds it to hidden', () => {
+    const { result } = renderHook(() =>
+      useDashboardLayouts(DashboardKey.Live, ['carry', 'club_speed', 'v_launch']),
+    );
+    act(() => {
+      result.current.hide('club_speed');
+    });
+    expect(result.current.hidden).toContain('club_speed');
+    for (const bp of ['kiosk', 'tablet', 'phone'] as const) {
+      const ids = result.current.layouts[bp].map((it) => it.i);
+      expect(ids).not.toContain('club_speed');
+    }
+  });
+
+  it('show() removes the card from hidden and re-appends it via reconciliation', () => {
+    const { result } = renderHook(() =>
+      useDashboardLayouts(DashboardKey.Live, ['carry', 'club_speed']),
+    );
+    act(() => {
+      result.current.hide('club_speed');
+    });
+    expect(result.current.layouts.kiosk.find((it) => it.i === 'club_speed')).toBeUndefined();
+    act(() => {
+      result.current.show('club_speed');
+    });
+    expect(result.current.hidden).not.toContain('club_speed');
+    expect(result.current.layouts.kiosk.find((it) => it.i === 'club_speed')).toBeDefined();
+  });
+
+  it('persists hidden ids and restores them on reload', () => {
+    const { result, unmount } = renderHook(() =>
+      useDashboardLayouts(DashboardKey.Live, ['carry', 'club_speed']),
+    );
+    act(() => {
+      result.current.hide('club_speed');
+    });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    unmount();
+
+    const { result: reloaded } = renderHook(() =>
+      useDashboardLayouts(DashboardKey.Live, ['carry', 'club_speed']),
+    );
+    expect(reloaded.current.hidden).toContain('club_speed');
+    expect(
+      reloaded.current.layouts.kiosk.find((it) => it.i === 'club_speed'),
+    ).toBeUndefined();
+  });
+
+  it('reset() clears hidden alongside reverting the layout', () => {
+    const { result } = renderHook(() =>
+      useDashboardLayouts(DashboardKey.Live, ['carry', 'club_speed']),
+    );
+    act(() => {
+      result.current.hide('club_speed');
+    });
+    expect(result.current.hidden).toContain('club_speed');
+    act(() => {
+      result.current.reset();
+    });
+    expect(result.current.hidden).toEqual([]);
+    expect(result.current.usingDefault).toBe(true);
   });
 });

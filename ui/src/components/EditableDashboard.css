@@ -1,16 +1,18 @@
 /*
- * EditableDashboard styling — only applies when edit mode is on.
- * View mode renders nothing of this; today's audited CSS grid drives.
- *
- * Visual cues: dashed outline on each widget, faint dotted background
- * on the grid area, grab cursor. Resize handles inherit react-grid-
- * layout's defaults but we tint them gold to match the brand.
+ * EditableDashboard styling. The grid renders in both view and edit
+ * mode (so user customisations are visible the moment they exit edit
+ * mode); only the chrome — outline, dotted background, grab cursor,
+ * resize handle — is gated to `--editing`.
  */
 
-.editable-dashboard--editing {
+.editable-dashboard {
   position: relative;
   width: 100%;
   flex: 1;
+  border-radius: var(--radius-md);
+}
+
+.editable-dashboard--editing {
   /* Faint dotted grid hint so users see the underlying structure. */
   background-image: radial-gradient(
     circle,
@@ -19,19 +21,50 @@
   );
   background-size: 16px 16px;
   background-position: -1px -1px;
-  border-radius: var(--radius-md);
 }
 
 .editable-dashboard__widget {
+  border-radius: var(--radius-md);
+  display: flex;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.editable-dashboard--editing .editable-dashboard__widget {
   outline: 1px dashed rgba(212, 175, 55, 0.4);
   outline-offset: -2px;
-  border-radius: var(--radius-md);
   cursor: grab;
 }
 
-.editable-dashboard__widget:active,
-.editable-dashboard__widget.react-draggable-dragging {
+.editable-dashboard--editing .editable-dashboard__widget:active,
+.editable-dashboard--editing .editable-dashboard__widget.react-draggable-dragging {
   cursor: grabbing;
+}
+
+/*
+ * Inner wrapper fills the RGL grid cell so the card inside stretches
+ * to whatever size RGL has decided. The cards' view-mode CSS gives
+ * them intrinsic content sizing (padding + font sizes); we deliberately
+ * override sizing here so the layout drives placement, while colour /
+ * typography stay put.
+ */
+.editable-dashboard__widget-content {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.editable-dashboard__widget-content > * {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
+  margin: 0;
 }
 
 /*
@@ -39,10 +72,10 @@
  * links etc keep their own. We set draggableCancel on RGL above so
  * those interactions aren't hijacked.
  */
-.editable-dashboard__widget button,
-.editable-dashboard__widget a,
-.editable-dashboard__widget input,
-.editable-dashboard__widget textarea {
+.editable-dashboard--editing .editable-dashboard__widget button,
+.editable-dashboard--editing .editable-dashboard__widget a,
+.editable-dashboard--editing .editable-dashboard__widget input,
+.editable-dashboard--editing .editable-dashboard__widget textarea {
   cursor: pointer;
 }
 
@@ -54,19 +87,99 @@
   opacity: 0.8 !important;
 }
 
-/* Resize handle in the corner of each widget — RGL renders a small
-   triangle, we tint it gold so it reads as part of the brand. */
-.editable-dashboard--editing .react-resizable-handle {
-  filter: hue-rotate(40deg) saturate(0.8);
+/*
+ * Resize handle — single bottom-right corner, the conventional
+ * affordance. Replaces RGL's tiny low-opacity SVG arrow with a gold
+ * triangle that's readable on the kiosk.
+ */
+.editable-dashboard--editing .react-resizable-handle-se {
+  background: none;
+  padding: 0;
+  opacity: 0.85;
+  transform: none;
+  z-index: 2;
+  transition: opacity 150ms ease;
+}
+
+.editable-dashboard--editing .react-resizable-handle-se:hover {
+  opacity: 1;
+}
+
+.editable-dashboard--editing .react-resizable-handle-se::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  right: 3px;
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-bottom: 10px solid var(--color-gold);
+  filter: drop-shadow(0 0 3px rgba(212, 175, 55, 0.6));
+  transition: filter 150ms ease;
+}
+
+.editable-dashboard--editing .react-resizable-handle-se:hover::after {
+  filter: drop-shadow(0 0 6px rgba(244, 207, 71, 0.9));
 }
 
 /*
- * Reset Layout button — shown only in edit mode, lives at the bottom
- * of the editable region. Confirmation handled in JS, so the button
- * itself stays simple.
+ * Hide button — small × in the top-right corner of each widget while
+ * editing. Stays clear of the bottom-right resize handle. The button
+ * itself short-circuits drag via RGL's draggableCancel + e.stopPropagation
+ * in JS, so a click hides without triggering a drag.
+ */
+.editable-dashboard__hide-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(15, 15, 15, 0.7);
+  color: rgba(245, 240, 230, 0.85);
+  border: 1px solid rgba(245, 240, 230, 0.18);
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  z-index: 3;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
+}
+
+.editable-dashboard__hide-btn:hover {
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.editable-dashboard__hide-btn:active {
+  transform: scale(0.92);
+}
+
+/*
+ * Toolbar — Reset + Add Cards sit horizontally below the grid in
+ * edit mode. Wraps to two rows on very narrow viewports.
+ */
+.editable-dashboard__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+/*
+ * Reset Layout button — shown only in edit mode. Confirmation handled
+ * in JS, so the button itself stays simple.
  */
 .editable-dashboard__reset {
-  margin-top: var(--space-md);
   padding: var(--space-sm) var(--space-md);
   background: transparent;
   border: 1px dashed var(--color-danger-border);
@@ -79,7 +192,6 @@
   text-transform: uppercase;
   cursor: pointer;
   transition: all var(--transition-fast);
-  align-self: flex-start;
   min-height: 44px;
   touch-action: manipulation;
 }
@@ -94,6 +206,186 @@
 }
 
 /*
+ * Add Cards button — opens the hidden-cards drawer. Disabled when no
+ * cards are hidden so users get a clear "nothing to do" signal.
+ */
+.editable-dashboard__add-btn {
+  padding: var(--space-sm) var(--space-md);
+  background: transparent;
+  border: 1px dashed rgba(212, 175, 55, 0.5);
+  border-radius: var(--radius-sm);
+  color: var(--color-gold);
+  font-family: var(--font-body);
+  font-size: var(--text-label-small);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  min-height: 44px;
+  touch-action: manipulation;
+}
+
+.editable-dashboard__add-btn:hover:not(:disabled) {
+  background: rgba(212, 175, 55, 0.08);
+  border-style: solid;
+}
+
+.editable-dashboard__add-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.editable-dashboard__add-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/*
+ * Hidden-cards drawer — slides in from the right with a backdrop. We
+ * use position: fixed so the drawer overlays whatever container the
+ * dashboard sits in, and a high z-index so it floats above the grid.
+ */
+.editable-dashboard__drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1000;
+  animation: drawer-backdrop-fade 200ms ease-out;
+}
+
+@keyframes drawer-backdrop-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.editable-dashboard__drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 320px;
+  max-width: 85vw;
+  background: var(--color-bg-card);
+  border-left: 1px solid rgba(212, 175, 55, 0.2);
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.45);
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  animation: drawer-slide-in 220ms var(--ease-out-quint);
+}
+
+@keyframes drawer-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.editable-dashboard__drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md);
+  border-bottom: 1px solid rgba(245, 240, 230, 0.08);
+}
+
+.editable-dashboard__drawer-header h3 {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+.editable-dashboard__drawer-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid rgba(245, 240, 230, 0.18);
+  color: var(--text-secondary);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 150ms ease;
+}
+
+.editable-dashboard__drawer-close:hover {
+  background: rgba(245, 240, 230, 0.08);
+  color: var(--text-primary);
+}
+
+.editable-dashboard__drawer-empty {
+  padding: var(--space-lg) var(--space-md);
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-label-small);
+  text-align: center;
+}
+
+.editable-dashboard__drawer-list {
+  flex: 1;
+  list-style: none;
+  margin: 0;
+  padding: var(--space-sm);
+  overflow-y: auto;
+}
+
+.editable-dashboard__drawer-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid rgba(245, 240, 230, 0.06);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-xs);
+  background: rgba(245, 240, 230, 0.02);
+}
+
+.editable-dashboard__drawer-label {
+  color: var(--text-primary);
+  font-size: var(--text-label);
+  font-weight: 500;
+}
+
+.editable-dashboard__drawer-add {
+  padding: var(--space-xs) var(--space-sm);
+  background: transparent;
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  border-radius: var(--radius-sm);
+  color: var(--color-gold);
+  font-family: var(--font-body);
+  font-size: var(--text-label-small);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  min-height: 36px;
+  transition: all 150ms ease;
+}
+
+.editable-dashboard__drawer-add:hover {
+  background: rgba(212, 175, 55, 0.1);
+  border-color: var(--color-gold);
+}
+
+.editable-dashboard__drawer-add:active {
+  transform: scale(0.96);
+}
+
+/*
  * Reduced motion — disable the drag/resize animation so the layout
  * snaps rather than smoothly translates. Users with vestibular needs
  * still get a usable edit mode, just without the smoothing.
@@ -103,5 +395,10 @@
   .react-grid-item.react-draggable-dragging,
   .react-grid-item.cssTransforms {
     transition: none !important;
+  }
+
+  .editable-dashboard__drawer,
+  .editable-dashboard__drawer-backdrop {
+    animation: none !important;
   }
 }
