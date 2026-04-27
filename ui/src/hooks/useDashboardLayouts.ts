@@ -12,7 +12,26 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { LayoutItem } from 'react-grid-layout';
+
+/**
+ * Shape of a single grid item, structurally compatible with
+ * react-grid-layout's `Layout` interface. We declare it locally so
+ * the hook doesn't depend on the upstream @types module structure
+ * (which can shift between versions and ESM/CJS differences) — the
+ * EditableDashboard wrapper handles the type bridge to RGL.
+ */
+export interface LayoutItem {
+  i: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  minW?: number;
+  maxW?: number;
+  minH?: number;
+  maxH?: number;
+  static?: boolean;
+}
 
 export const SCHEMA_VERSION = 1;
 const STORAGE_KEY = 'openflight.dashboard.v1';

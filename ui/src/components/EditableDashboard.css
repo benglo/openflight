@@ -1,0 +1,74 @@
+/*
+ * EditableDashboard styling — only applies when edit mode is on.
+ * View mode renders nothing of this; today's audited CSS grid drives.
+ *
+ * Visual cues: dashed outline on each widget, faint dotted background
+ * on the grid area, grab cursor. Resize handles inherit react-grid-
+ * layout's defaults but we tint them gold to match the brand.
+ */
+
+.editable-dashboard--editing {
+  position: relative;
+  width: 100%;
+  flex: 1;
+  /* Faint dotted grid hint so users see the underlying structure. */
+  background-image: radial-gradient(
+    circle,
+    rgba(245, 240, 230, 0.06) 1px,
+    transparent 1px
+  );
+  background-size: 16px 16px;
+  background-position: -1px -1px;
+  border-radius: var(--radius-md);
+}
+
+.editable-dashboard__widget {
+  outline: 1px dashed rgba(212, 175, 55, 0.4);
+  outline-offset: -2px;
+  border-radius: var(--radius-md);
+  cursor: grab;
+}
+
+.editable-dashboard__widget:active,
+.editable-dashboard__widget.react-draggable-dragging {
+  cursor: grabbing;
+}
+
+/*
+ * Internals of each widget shouldn't show grab cursor — buttons,
+ * links etc keep their own. We set draggableCancel on RGL above so
+ * those interactions aren't hijacked.
+ */
+.editable-dashboard__widget button,
+.editable-dashboard__widget a,
+.editable-dashboard__widget input,
+.editable-dashboard__widget textarea {
+  cursor: pointer;
+}
+
+/* RGL placeholder while dragging — its empty grid slot. Tint to match. */
+.react-grid-placeholder {
+  background: rgba(212, 175, 55, 0.12) !important;
+  border-radius: var(--radius-md);
+  border: 1px dashed rgba(212, 175, 55, 0.4);
+  opacity: 0.8 !important;
+}
+
+/* Resize handle in the corner of each widget — RGL renders a small
+   triangle, we tint it gold so it reads as part of the brand. */
+.editable-dashboard--editing .react-resizable-handle {
+  filter: hue-rotate(40deg) saturate(0.8);
+}
+
+/*
+ * Reduced motion — disable the drag/resize animation so the layout
+ * snaps rather than smoothly translates. Users with vestibular needs
+ * still get a usable edit mode, just without the smoothing.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .editable-dashboard__widget,
+  .react-grid-item.react-draggable-dragging,
+  .react-grid-item.cssTransforms {
+    transition: none !important;
+  }
+}
