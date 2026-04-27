@@ -209,6 +209,7 @@ uv run pytest tests/ -v
 - **[Rolling Buffer & Spin Detection](docs/rolling_buffer_spin_detection.md)** — Spin measurement details
 - **[K-LD7 Ball Detection Theory](docs/kld7-ball-detection-theory.md)** — How angle detection works
 - **[K-LD7 Session Review](docs/kld7-session-review.md)** — Offline review workflow for session JSONL files
+- **[Replay Framework](docs/replay-framework.md)** — Regression / A-B testing harness for offline signal-processing iteration
 - **[Observability & Log Shipping](docs/observability.md)** — Ship logs to Grafana Cloud
 - **[Contributing Guide](CONTRIBUTING.md)** — How to contribute
 - **[Changelog](docs/CHANGELOG.md)** — Version history
