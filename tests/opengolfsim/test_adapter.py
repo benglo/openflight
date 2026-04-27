@@ -5,7 +5,12 @@ from datetime import datetime
 import pytest
 
 from openflight.launch_monitor import ClubType, Shot
-from openflight.opengolfsim.adapter import parse_ogs_club_id, shot_to_packet
+from openflight.opengolfsim.adapter import (
+    parse_ogs_club_id,
+    shot_to_packet,
+    to_sim_player_update,
+    to_sim_result,
+)
 
 
 def _shot(**kwargs) -> Shot:
@@ -168,3 +173,64 @@ def test_parse_ogs_club_id_unknown_returns_none():
 def test_parse_ogs_club_id_empty_returns_none():
     assert parse_ogs_club_id("") is None
     assert parse_ogs_club_id(None) is None
+
+
+# --- to_sim_result ---
+
+
+def test_to_sim_result_converts_metres_to_yards():
+    """OGS reports distances in metres; the normalized type is in yards."""
+    payload = {
+        "result": {
+            "carry": 196.06776428222656,
+            "height": 18.728025436401367,
+            "roll": 6.482479572296143,
+            "total": 202.54876708984375,
+            "lateral": -0.07558325678110123,
+        },
+        "sessionId": 22,
+    }
+    sim = to_sim_result(payload)
+    assert sim is not None
+    assert sim.source == "opengolfsim"
+    assert sim.carry_yards == pytest.approx(214.39, abs=0.1)
+    assert sim.total_yards == pytest.approx(221.49, abs=0.1)
+    assert sim.max_height_yards == pytest.approx(20.48, abs=0.1)
+    assert sim.lateral_yards == pytest.approx(-0.0827, abs=0.01)
+    assert sim.roll_yards == pytest.approx(7.09, abs=0.1)
+    assert sim.sim_session_id == "22"
+
+
+def test_to_sim_result_missing_required_returns_none():
+    """No carry / total in the payload -> None (caller decides how to react)."""
+    assert to_sim_result({}) is None
+    assert to_sim_result({"result": {}}) is None
+    assert to_sim_result({"result": {"carry": 100}}) is None  # missing total
+    assert to_sim_result({"result": {"total": 100}}) is None  # missing carry
+
+
+def test_to_sim_result_height_and_lateral_default_to_zero():
+    """OGS rarely omits these but if it does, default to 0 instead of crashing."""
+    payload = {"result": {"carry": 100.0, "total": 110.0}}
+    sim = to_sim_result(payload)
+    assert sim is not None
+    assert sim.max_height_yards == 0.0
+    assert sim.lateral_yards == 0.0
+    assert sim.roll_yards is None  # explicitly missing
+
+
+# --- to_sim_player_update ---
+
+
+def test_to_sim_player_update_pulls_club_id_and_name():
+    payload = {"club": {"id": "7I", "name": "7-Iron", "distance": 165}}
+    upd = to_sim_player_update(payload)
+    assert upd.source == "opengolfsim"
+    assert upd.club_id == "7I"
+    assert upd.club_name == "7-Iron"
+
+
+def test_to_sim_player_update_handles_missing_club():
+    upd = to_sim_player_update({})
+    assert upd.club_id is None
+    assert upd.club_name is None

@@ -69,6 +69,8 @@ function AppContent() {
     cameraStatus,
     triggerDiagnostics,
     triggerStatus,
+    latestSimResult,
+    currentClub,
     clearSession,
     setClub,
     simulateShot,
@@ -82,7 +84,16 @@ function AppContent() {
   const { latestShot, shots, isNewShot, shotVersion } = useShotContext();
 
   const [currentView, setCurrentView] = useState<View>('live');
+  // Local club selection used for the dropdown. Initial value matches the
+  // backend default; subsequent updates come from either the user picking
+  // a club in the UI OR the sim sending a `club_changed` event (mirrored
+  // into `currentClub` by useSocket).
   const [selectedClub, setSelectedClub] = useState('driver');
+
+  // Keep the dropdown in sync with sim-driven club changes.
+  useEffect(() => {
+    setSelectedClub(currentClub);
+  }, [currentClub]);
   const [showShutdown, setShowShutdown] = useState(false);
   const { isLaunchDaddyMode, isExploding, triggerExplosion, handleSecretTap } = useLaunchDaddy();
   const { unitSystem, setUnitSystem } = useUnitPreference();
@@ -228,7 +239,12 @@ function AppContent() {
         {currentView === 'live' && (
           <div className="live-view">
             {isNewShot && <div key={shotVersion} className="shot-flash" />}
-            <ShotDisplay key={shotVersion} shot={latestShot} animate={isNewShot} />
+            <ShotDisplay
+              key={shotVersion}
+              shot={latestShot}
+              animate={isNewShot}
+              simResult={latestSimResult}
+            />
             {mockMode && (
               <button className="simulate-button" onClick={simulateShot}>
                 Simulate Shot

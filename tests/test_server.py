@@ -522,10 +522,10 @@ class TestOnShotDetected:
         assert shot.launch_angle_vertical == pytest.approx(18.7)
 
 
-class TestOpenGolfSimForwarding:
-    """Tests that opt-in OpenGolfSim forwarding is wired into the shot pipeline."""
+class TestSimForwarding:
+    """Tests that opt-in sim forwarding is wired into the shot pipeline."""
 
-    def test_shot_forwarded_to_opengolfsim_when_enabled(self, monkeypatch):
+    def test_shot_forwarded_to_sim_when_enabled(self, monkeypatch):
         sent = []
 
         class StubClient:
@@ -533,7 +533,7 @@ class TestOpenGolfSimForwarding:
                 sent.append((shot, unit))
                 return True
 
-        monkeypatch.setattr(server_module.state, "opengolfsim", StubClient())
+        monkeypatch.setattr(server_module.state, "sim_client", StubClient())
         monkeypatch.setattr(server_module.state, "kld7_vertical", None)
         monkeypatch.setattr(server_module.state, "kld7_horizontal", None)
         monkeypatch.setattr(server_module.state, "camera_tracker", None)
@@ -560,7 +560,7 @@ class TestOpenGolfSimForwarding:
 
     def test_shot_not_forwarded_when_disabled(self, monkeypatch):
         """state.opengolfsim is None by default → no forwarding, no error."""
-        monkeypatch.setattr(server_module.state, "opengolfsim", None)
+        monkeypatch.setattr(server_module.state, "sim_client", None)
         monkeypatch.setattr(server_module.state, "kld7_vertical", None)
         monkeypatch.setattr(server_module.state, "kld7_horizontal", None)
         monkeypatch.setattr(server_module.state, "camera_tracker", None)

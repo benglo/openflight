@@ -46,6 +46,28 @@ export interface DebugShotLog {
   club: string;
 }
 
+/**
+ * Sim-agnostic shape of the data the server forwards on the `sim_result`
+ * event. All distance fields are in YARDS — the integration layer
+ * normalizes per-sim units (e.g. OpenGolfSim metres) at the boundary
+ * so the UI never needs to know which sim produced the result.
+ */
+export interface SimResult {
+  source: string; // e.g. "opengolfsim", "gspro", "e6"
+  carry_yards: number;
+  total_yards: number;
+  max_height_yards: number;
+  lateral_yards: number;
+  roll_yards: number | null;
+  sim_session_id: string | null;
+}
+
+export interface SimPlayerUpdate {
+  source: string;
+  club_id: string | null;
+  club_name: string | null;
+}
+
 export function useSocket() {
   const socketRef = useRef<Socket | null>(null);
   const { addShot, setShots, clearShots } = useShotContext();
@@ -81,6 +103,12 @@ export function useSocket() {
     ball_detected: false,
     ball_confidence: 0,
   });
+  // External-sim integration state (sim-agnostic).
+  const [latestSimResult, setLatestSimResult] = useState<SimResult | null>(null);
+  // Currently selected club, kept in sync with both UI selection and
+  // sim-side club updates (`club_changed` events).
+  const [currentClub, setCurrentClub] = useState<string>('driver');
+
   // Trigger diagnostics state
   const [triggerDiagnostics, setTriggerDiagnostics] = useState<TriggerDiagnostic[]>([]);
   const [triggerStatus, setTriggerStatus] = useState<TriggerStatus>({
@@ -112,6 +140,20 @@ export function useSocket() {
 
     newSocket.on('shot', (data: { shot: Shot; stats: SessionStats }) => {
       addShotRef.current(data.shot);
+      // A new shot supersedes any previous sim result — clear so the shot
+      // card doesn't show stale carry/lateral data from the prior shot
+      // until the new result arrives from whichever sim is connected.
+      setLatestSimResult(null);
+    });
+
+    newSocket.on('sim_result', (data: SimResult) => {
+      setLatestSimResult(data);
+    });
+
+    newSocket.on('club_changed', (data: { club: string }) => {
+      if (data?.club) {
+        setCurrentClub(data.club);
+      }
     });
 
     newSocket.on(
@@ -261,6 +303,8 @@ export function useSocket() {
     cameraStatus,
     triggerDiagnostics,
     triggerStatus,
+    latestSimResult,
+    currentClub,
     clearSession,
     setClub,
     simulateShot,

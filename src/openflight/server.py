@@ -88,8 +88,13 @@ class AppState:  # pylint: disable=too-few-public-methods
         # Radar configuration (mutated via socket events)
         self.radar_config: dict = {}
 
-        # OpenGolfSim integration (None when --opengolfsim is not set)
-        self.opengolfsim = None
+        # External sim integration (None unless one of the --<sim> flags is set).
+        # Sim-agnostic: holds whichever SimClient implementation is enabled,
+        # so server code can talk to it without per-sim branching.
+        self.sim_client = None
+        # Name of the active sim adapter (e.g. "opengolfsim"). Surfaced to the
+        # UI alongside the result so the front-end can label results.
+        self.sim_source: Optional[str] = None
 
 
 state = AppState()
@@ -1162,11 +1167,11 @@ def on_shot_detected(shot: Shot):
     except Exception as e:
         logger.warning("[SERVER] Failed to log shot: %s", e, exc_info=True)
 
-    # Forward to OpenGolfSim if enabled. Do this before the UI emit so a
-    # slow simulator doesn't delay the user-visible shot card; client.send_shot
-    # only enqueues, never blocks on I/O.
-    if state.opengolfsim is not None:
-        state.opengolfsim.send_shot(shot)
+    # Forward to the connected external sim (if any). Do this before the UI
+    # emit so a slow simulator doesn't delay the user-visible shot card;
+    # send_shot only enqueues, never blocks on I/O.
+    if state.sim_client is not None:
+        state.sim_client.send_shot(shot)
 
     # Emit shot with launch angle data included
     try:
@@ -1736,36 +1741,50 @@ def main():
     )
 
     if args.opengolfsim:
-        from .opengolfsim import OpenGolfSimClient  # pylint: disable=import-outside-toplevel
-        from .opengolfsim.adapter import parse_ogs_club_id  # pylint: disable=import-outside-toplevel
+        # pylint: disable=import-outside-toplevel
+        from .opengolfsim import OpenGolfSimClient
+        from .opengolfsim.adapter import (
+            parse_ogs_club_id,
+            to_sim_player_update,
+            to_sim_result,
+        )
 
-        def _on_ogs_player_update(data: dict) -> None:
-            club_obj = (data or {}).get("club") or {}
-            club_id = club_obj.get("id")
-            club = parse_ogs_club_id(club_id)
+        state.sim_source = "opengolfsim"
+
+        def _on_sim_player_update(data: dict) -> None:
+            update = to_sim_player_update(data)
+            club = parse_ogs_club_id(update.club_id)
             if club is None:
-                if club_id:
+                if update.club_id:
                     logger.warning(
-                        "[OPENGOLFSIM] Unknown club id %r — keeping current selection",
-                        club_id,
+                        "[SIM] Unknown club id %r from %s — keeping current selection",
+                        update.club_id, update.source,
                     )
                 return
             if state.monitor:
                 state.monitor.set_club(club)
             socketio.emit("club_changed", {"club": club.value})
+            socketio.emit("sim_player_update", update.to_dict())
 
-        def _on_ogs_result(data: dict) -> None:
-            socketio.emit("opengolfsim_result", data or {})
+        def _on_sim_result(data: dict) -> None:
+            sim = to_sim_result(data)
+            if sim is None:
+                logger.warning(
+                    "[SIM] Dropping result with missing carry/total: %s",
+                    str(data)[:200],
+                )
+                return
+            socketio.emit("sim_result", sim.to_dict())
 
-        state.opengolfsim = OpenGolfSimClient(
+        state.sim_client = OpenGolfSimClient(
             host=args.opengolfsim_host,
             port=args.opengolfsim_port,
-            on_player_update=_on_ogs_player_update,
-            on_result=_on_ogs_result,
+            on_player_update=_on_sim_player_update,
+            on_result=_on_sim_result,
         )
-        state.opengolfsim.start()
+        state.sim_client.start()
         logger.info(
-            "[SERVER] OpenGolfSim integration enabled (%s:%d)",
+            "[SERVER] Sim integration enabled: opengolfsim (%s:%d)",
             args.opengolfsim_host, args.opengolfsim_port,
         )
 
@@ -1783,8 +1802,8 @@ def main():
             app, host=args.host, port=args.web_port, debug=False, allow_unsafe_werkzeug=True
         )
     finally:
-        if state.opengolfsim is not None:
-            state.opengolfsim.stop()
+        if state.sim_client is not None:
+            state.sim_client.stop()
         if state.kld7_vertical:
             state.kld7_vertical.stop()
         if state.kld7_horizontal:

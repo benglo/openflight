@@ -101,6 +101,26 @@ instead of OpenFlight's estimate. (UI changes are tracked separately.)
 - **Process shutdown**: `Ctrl+C` cleanly closes the socket and joins
   both threads within 2 seconds.
 
+## Architecture: sim-agnostic boundary
+
+OpenGolfSim is one of (eventually) several supported simulators. The
+integration is structured so the React UI and server-side event names
+don't reference OpenGolfSim directly — that's only an implementation
+detail of the adapter layer:
+
+| Layer | Lives in | Sim-aware? |
+|---|---|---|
+| Wire protocol (TCP packet format) | `openflight.opengolfsim` | yes — OGS-specific |
+| Adapter (Shot → packet, result → SimShotResult) | `openflight.opengolfsim.adapter` | yes — OGS-specific |
+| Normalized result type (`SimShotResult` in yards) | `openflight.sim` | no |
+| Server emit (`sim_result`, `sim_player_update`) | `server.py` | no |
+| React UI (`SimResult`, `simResult` prop) | `ui/src/` | no |
+
+A future GSPro / E6 / TGC integration would add a sibling
+`openflight.<sim>` package with its own client + adapter, convert its
+native results into the same `SimShotResult` shape, and the front-end
+would render them transparently with the right source label.
+
 ## Limitations
 
 - **No authentication**: OpenGolfSim's API has no auth or pairing. Run
@@ -109,10 +129,6 @@ instead of OpenFlight's estimate. (UI changes are tracked separately.)
 - **Device status is informational only**: we send `ready` on connect
   but don't toggle `busy`/`ready` per shot. OpenGolfSim doesn't appear
   to require it.
-- **No shot result → carry display yet**: the inbound `result` event
-  is emitted to the UI but the React app doesn't render it. Wiring it
-  into the shot card so the simulator's carry replaces OpenFlight's
-  estimate is a follow-up.
 - **No error responses from sim**: the OpenGolfSim API doesn't document
   any error/NACK format. If the sim rejects a packet, we don't know.
 

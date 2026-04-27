@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { Shot } from '../types/shot';
+import type { SimResult } from '../hooks/useSocket';
 import { useUnitPreference } from '../state/useUnitPreference';
 import { formatCarryRange, formatDistance, formatSpeed, getDistanceUnit, getSpeedUnit } from '../utils/units';
 import './ShotDisplay.css';
@@ -7,7 +8,18 @@ import './ShotDisplay.css';
 interface ShotDisplayProps {
   shot: Shot | null;
   animate?: boolean;
+  /** Latest normalized result from whichever external sim is connected. */
+  simResult?: SimResult | null;
 }
+
+// Friendly labels for sim sources — fall back to the raw key if a new
+// integration shows up that we haven't labeled yet.
+const SIM_SOURCE_LABELS: Record<string, string> = {
+  opengolfsim: 'OpenGolfSim',
+  gspro: 'GSPro',
+  e6: 'E6 Connect',
+  tgc: 'TGC 2019',
+};
 
 const GAUGE_MIN = 0;
 const GAUGE_MAX = 200; // mph
@@ -126,7 +138,7 @@ function getLaunchAngleQuality(confidence: number | null): 'high' | 'medium' | '
   return 'low';
 }
 
-export function ShotDisplay({ shot, animate = false }: ShotDisplayProps) {
+export function ShotDisplay({ shot, animate = false, simResult = null }: ShotDisplayProps) {
   const { unitSystem } = useUnitPreference();
   const carryRange = useMemo(() => {
     if (!shot) return null;
@@ -135,6 +147,12 @@ export function ShotDisplay({ shot, animate = false }: ShotDisplayProps) {
 
   const displayCarry = shot?.carry_spin_adjusted ?? shot?.estimated_carry_yards ?? 0;
   const carrySubtext = shot?.carry_spin_adjusted ? 'spin-adjusted' : carryRange || undefined;
+
+  // Sim result distances are already normalized to yards by the
+  // integration layer; no per-sim conversion needed here.
+  const simSourceLabel = simResult
+    ? SIM_SOURCE_LABELS[simResult.source] ?? simResult.source
+    : null;
 
   if (!shot) {
     return (
@@ -237,6 +255,50 @@ export function ShotDisplay({ shot, animate = false }: ShotDisplayProps) {
             variant="spin"
             confidence={hasSpin ? shot.spin_quality : null}
           />
+          {simResult && (
+            <>
+              <MetricCard
+                value={formatDistance(simResult.carry_yards, unitSystem, 0)}
+                unit={getDistanceUnit(unitSystem)}
+                label="Sim Carry"
+                subtext={simSourceLabel ?? undefined}
+                variant="primary"
+              />
+              <MetricCard
+                value={formatDistance(simResult.total_yards, unitSystem, 0)}
+                unit={getDistanceUnit(unitSystem)}
+                label="Sim Total"
+                subtext={
+                  simResult.roll_yards !== null && simResult.roll_yards !== undefined
+                    ? `+${formatDistance(simResult.roll_yards, unitSystem, 0)} ${getDistanceUnit(unitSystem)} roll`
+                    : undefined
+                }
+                variant="secondary"
+              />
+              <MetricCard
+                value={
+                  (simResult.lateral_yards >= 0 ? '+' : '') +
+                  formatDistance(simResult.lateral_yards, unitSystem, 1)
+                }
+                unit={getDistanceUnit(unitSystem)}
+                label="Sim Lateral"
+                subtext={
+                  simResult.lateral_yards > 1
+                    ? 'right'
+                    : simResult.lateral_yards < -1
+                      ? 'left'
+                      : 'straight'
+                }
+                variant="secondary"
+              />
+              <MetricCard
+                value={formatDistance(simResult.max_height_yards, unitSystem, 0)}
+                unit={getDistanceUnit(unitSystem)}
+                label="Sim Apex"
+                variant="secondary"
+              />
+            </>
+          )}
         </div>
       </div>
     </div>
