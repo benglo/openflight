@@ -142,11 +142,11 @@
 }
 
 .nav__button--recording {
-  border-color: rgba(248, 113, 113, 0.4);
+  border-color: var(--color-danger-border-strong);
 }
 
 .nav__button--streaming {
-  border-color: rgba(96, 165, 250, 0.4);
+  border-color: var(--color-info-tint);
 }
 
 .nav__recording-dot {
@@ -263,14 +263,14 @@
   border: none;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.08);
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .power-button:hover {
-  background: rgba(248, 113, 113, 0.2);
-  color: #f87171;
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
 }
 
 .shutdown-overlay {
@@ -294,7 +294,7 @@
 
 .shutdown-dialog p {
   font-size: 1.125rem;
-  color: var(--color-text);
+  color: var(--text-primary);
   margin: 0 0 1.5rem;
 }
 
@@ -308,15 +308,15 @@
   padding: 0.625rem 1.5rem;
   border: none;
   border-radius: 8px;
-  background: #dc2626;
-  color: white;
+  background: var(--color-danger-strong);
+  color: var(--color-cream);
   font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
 }
 
 .shutdown-dialog__confirm:active {
-  background: #b91c1c;
+  background: var(--color-danger-deep);
 }
 
 .shutdown-dialog__cancel {
@@ -324,7 +324,7 @@
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
   background: transparent;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 0.9375rem;
   cursor: pointer;
 }

@@ -99,7 +99,7 @@
   width: 100%;
   padding: var(--space-md);
   background: transparent;
-  border: 1px solid rgba(248, 113, 113, 0.3);
+  border: 1px solid var(--color-danger-border);
   border-radius: var(--radius-md);
   color: var(--color-danger);
   font-size: 0.875rem;
@@ -113,7 +113,7 @@
 
 .clear-button:active {
   transform: scale(0.98);
-  background: rgba(248, 113, 113, 0.1);
+  background: var(--color-danger-bg);
 }
 
 /* Responsive for 7" screen */

@@ -10,28 +10,56 @@
   --font-display: 'DM Serif Display', Georgia, serif;
   --font-body: 'Outfit', system-ui, -apple-system, sans-serif;
 
-  /* Color Palette - Premium Golf */
-  --color-bg-deep: #0a0a0f;
-  --color-bg-card: #12121a;
-  --color-bg-elevated: #1a1a24;
-  --color-bg-hover: #222230;
+  /*
+   * Backgrounds — warmed from the previous near-black blue-violet to a
+   * very low-chroma gold-hue dark. The neutrals now share the brand's
+   * hue (≈80°) at vanishing chroma, so cards and the gold accent are
+   * subtly cohesive instead of feeling stuck on a cool slate.
+   */
+  --color-bg-deep: oklch(0.06 0.01 80);
+  --color-bg-card: oklch(0.105 0.012 80);
+  --color-bg-elevated: oklch(0.14 0.014 80);
+  --color-bg-hover: oklch(0.185 0.016 80);
 
-  /* Gold accent (primary) */
+  /* Gold accent (primary brand) */
   --color-gold: #d4af37;
   --color-gold-bright: #f4cf47;
   --color-gold-dim: #a68b2a;
   --color-gold-glow: rgba(212, 175, 55, 0.4);
 
-  /* Cream/ivory (secondary) */
+  /* Cream/ivory (text on dark) */
   --color-cream: #f5f0e6;
   --color-cream-dim: rgba(245, 240, 230, 0.7);
   --color-cream-muted: rgba(245, 240, 230, 0.5);
 
-  /* Accent colors */
+  /* Semantic accents — base hex */
   --color-success: #4ade80;
   --color-info: #60a5fa;
   --color-warning: #fbbf24;
   --color-danger: #f87171;
+  --color-spin: #a855f7;
+  --color-spin-bright: #c084fc;
+  --color-danger-strong: #dc2626;
+  --color-danger-deep: #b91c1c;
+
+  /*
+   * Tinted variants for backgrounds, borders, and glows. Defined as
+   * tokens so the same color family can be themed in one place rather
+   * than scattered as `rgba(...)` literals across components.
+   */
+  --color-info-bg: rgba(96, 165, 250, 0.05);
+  --color-info-border: rgba(96, 165, 250, 0.15);
+  --color-info-tint: rgba(96, 165, 250, 0.4);
+
+  --color-spin-bg: rgba(168, 85, 247, 0.08);
+  --color-spin-border: rgba(168, 85, 247, 0.25);
+  --color-spin-glow: rgba(168, 85, 247, 0.4);
+  --color-spin-dot-idle: rgba(168, 85, 247, 0.2);
+  --color-spin-dot-active-glow: rgba(168, 85, 247, 0.5);
+
+  --color-danger-bg: rgba(248, 113, 113, 0.1);
+  --color-danger-border: rgba(248, 113, 113, 0.3);
+  --color-danger-border-strong: rgba(248, 113, 113, 0.4);
 
   /* Text */
   --text-primary: var(--color-cream);
@@ -70,6 +98,29 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/*
+ * Baseline light mode. The kiosk runs dark by default; this branch
+ * just keeps the system honest for outdoor / sunlight viewing and
+ * for users with `prefers-color-scheme: light`. We invert the
+ * neutral lightness scale and the cream tones; semantic accents
+ * (gold, info, spin, danger) are unchanged because they read on
+ * both grounds.
+ */
+@media (prefers-color-scheme: light) {
+  :root {
+    --color-bg-deep: oklch(0.98 0.005 80);
+    --color-bg-card: oklch(0.955 0.007 80);
+    --color-bg-elevated: oklch(0.93 0.009 80);
+    --color-bg-hover: oklch(0.90 0.012 80);
+
+    --color-cream: oklch(0.18 0.01 80);
+    --color-cream-dim: oklch(0.38 0.01 80);
+    --color-cream-muted: oklch(0.55 0.01 80);
+
+    color-scheme: light;
+  }
 }
 
 body {

@@ -178,18 +178,18 @@
 }
 
 .metric-card--secondary {
-  background: rgba(96, 165, 250, 0.05);
-  border-color: rgba(96, 165, 250, 0.15);
+  background: var(--color-info-bg);
+  border-color: var(--color-info-border);
 }
 
 .metric-card--spin {
-  background: rgba(168, 85, 247, 0.08);
-  border-color: rgba(168, 85, 247, 0.25);
+  background: var(--color-spin-bg);
+  border-color: var(--color-spin-border);
 }
 
 .metric-card--spin .metric-card__value {
-  color: #c084fc;
-  text-shadow: 0 0 15px rgba(168, 85, 247, 0.4);
+  color: var(--color-spin-bright);
+  text-shadow: 0 0 15px var(--color-spin-glow);
 }
 
 .metric-card__value-row {
@@ -260,13 +260,13 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: rgba(168, 85, 247, 0.2);
+  background: var(--color-spin-dot-idle);
   transition: all 0.3s ease;
 }
 
 .metric-card__confidence-dots .dot.filled {
-  background: #c084fc;
-  box-shadow: 0 0 6px rgba(168, 85, 247, 0.5);
+  background: var(--color-spin-bright);
+  box-shadow: 0 0 6px var(--color-spin-dot-active-glow);
 }
 
 .metric-card__confidence-label {
@@ -278,11 +278,11 @@
 }
 
 .metric-card__confidence--high .metric-card__confidence-label {
-  color: #a855f7;
+  color: var(--color-spin);
 }
 
 .metric-card__confidence--medium .metric-card__confidence-label {
-  color: #c084fc;
+  color: var(--color-spin-bright);
 }
 
 .metric-card__confidence--low .metric-card__confidence-label {
