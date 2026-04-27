@@ -5,7 +5,7 @@ from datetime import datetime
 import pytest
 
 from openflight.launch_monitor import ClubType, Shot
-from openflight.opengolfsim.adapter import shot_to_packet
+from openflight.opengolfsim.adapter import parse_ogs_club_id, shot_to_packet
 
 
 def _shot(**kwargs) -> Shot:
@@ -114,3 +114,57 @@ def test_shot_to_packet_metric_unit_invalid_raises():
     )
     with pytest.raises(ValueError):
         shot_to_packet(s, unit="furlongs_per_fortnight")
+
+
+# --- parse_ogs_club_id ---
+
+
+@pytest.mark.parametrize(
+    "ogs_id, expected",
+    [
+        ("Dr", ClubType.DRIVER),
+        ("D", ClubType.DRIVER),
+        ("Driver", ClubType.DRIVER),
+        ("3W", ClubType.WOOD_3),
+        ("5W", ClubType.WOOD_5),
+        ("7W", ClubType.WOOD_7),
+        ("3H", ClubType.HYBRID_3),
+        ("5H", ClubType.HYBRID_5),
+        ("7H", ClubType.HYBRID_7),
+        ("9H", ClubType.HYBRID_9),
+        ("2I", ClubType.IRON_2),
+        ("3I", ClubType.IRON_3),
+        ("4I", ClubType.IRON_4),
+        ("5I", ClubType.IRON_5),
+        ("6I", ClubType.IRON_6),
+        ("7I", ClubType.IRON_7),
+        ("8I", ClubType.IRON_8),
+        ("9I", ClubType.IRON_9),
+        ("PW", ClubType.PW),
+        ("GW", ClubType.GW),
+        ("SW", ClubType.SW),
+        ("LW", ClubType.LW),
+    ],
+)
+def test_parse_ogs_club_id_known_codes(ogs_id, expected):
+    assert parse_ogs_club_id(ogs_id) is expected
+
+
+def test_parse_ogs_club_id_case_insensitive():
+    assert parse_ogs_club_id("3w") is ClubType.WOOD_3
+    assert parse_ogs_club_id("7i") is ClubType.IRON_7
+    assert parse_ogs_club_id("pw") is ClubType.PW
+
+
+def test_parse_ogs_club_id_strips_whitespace():
+    assert parse_ogs_club_id("  3W  ") is ClubType.WOOD_3
+
+
+def test_parse_ogs_club_id_unknown_returns_none():
+    assert parse_ogs_club_id("zzz") is None
+    assert parse_ogs_club_id("11I") is None
+
+
+def test_parse_ogs_club_id_empty_returns_none():
+    assert parse_ogs_club_id("") is None
+    assert parse_ogs_club_id(None) is None

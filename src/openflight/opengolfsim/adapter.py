@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import logging
+from typing import Optional
 
-from openflight.launch_monitor import Shot
+from openflight.launch_monitor import ClubType, Shot
 from openflight.rolling_buffer.monitor import get_optimal_spin_for_ball_speed
 
 from .protocol import (
@@ -79,4 +80,45 @@ def shot_to_packet(shot: Shot, unit: str = UNIT_IMPERIAL) -> dict:
     }
 
 
-__all__ = ["shot_to_packet"]
+# OpenGolfSim ships compact club identifiers like "Dr", "3W", "7I", "PW";
+# OpenFlight's ClubType enum uses values like "driver", "3-wood", "7-iron",
+# "pw". This table bridges the two so inbound player updates can swap the
+# selected club without the user having to manually re-pick.
+_OGS_CLUB_ID_TO_TYPE: dict[str, ClubType] = {
+    "DR": ClubType.DRIVER,
+    "D": ClubType.DRIVER,
+    "DRIVER": ClubType.DRIVER,
+    "3W": ClubType.WOOD_3,
+    "5W": ClubType.WOOD_5,
+    "7W": ClubType.WOOD_7,
+    "3H": ClubType.HYBRID_3,
+    "5H": ClubType.HYBRID_5,
+    "7H": ClubType.HYBRID_7,
+    "9H": ClubType.HYBRID_9,
+    "2I": ClubType.IRON_2,
+    "3I": ClubType.IRON_3,
+    "4I": ClubType.IRON_4,
+    "5I": ClubType.IRON_5,
+    "6I": ClubType.IRON_6,
+    "7I": ClubType.IRON_7,
+    "8I": ClubType.IRON_8,
+    "9I": ClubType.IRON_9,
+    "PW": ClubType.PW,
+    "GW": ClubType.GW,
+    "SW": ClubType.SW,
+    "LW": ClubType.LW,
+}
+
+
+def parse_ogs_club_id(club_id: Optional[str]) -> Optional[ClubType]:
+    """Map an OpenGolfSim club id (e.g. ``"3W"``, ``"7I"``) to a ``ClubType``.
+
+    Returns ``None`` if ``club_id`` is missing or doesn't match a known club.
+    Comparison is case-insensitive and tolerant of surrounding whitespace.
+    """
+    if not club_id:
+        return None
+    return _OGS_CLUB_ID_TO_TYPE.get(club_id.strip().upper())
+
+
+__all__ = ["parse_ogs_club_id", "shot_to_packet"]

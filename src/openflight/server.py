@@ -1737,18 +1737,18 @@ def main():
 
     if args.opengolfsim:
         from .opengolfsim import OpenGolfSimClient  # pylint: disable=import-outside-toplevel
+        from .opengolfsim.adapter import parse_ogs_club_id  # pylint: disable=import-outside-toplevel
 
         def _on_ogs_player_update(data: dict) -> None:
             club_obj = (data or {}).get("club") or {}
             club_id = club_obj.get("id")
-            if not club_id:
-                return
-            try:
-                club = ClubType(club_id.lower())
-            except ValueError:
-                logger.warning(
-                    "[OPENGOLFSIM] Unknown club id %r — keeping current selection", club_id,
-                )
+            club = parse_ogs_club_id(club_id)
+            if club is None:
+                if club_id:
+                    logger.warning(
+                        "[OPENGOLFSIM] Unknown club id %r — keeping current selection",
+                        club_id,
+                    )
                 return
             if state.monitor:
                 state.monitor.set_club(club)
