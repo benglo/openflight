@@ -177,3 +177,37 @@ button {
   outline: 2px solid var(--color-gold);
   outline-offset: 2px;
 }
+
+/*
+ * Visually hide content while keeping it available to screen readers.
+ * Use this on headings that structure the page for assistive tech but
+ * would clutter the visual design.
+ */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/*
+ * Honor the user's motion preference. We have several attention-grabbing
+ * animations (gauge fill, value pop, ball-breathe, shot-glow, pulse-*)
+ * that are pleasant for most users but actively distressing for users
+ * with vestibular disorders. Collapse all of them to a single frame.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
