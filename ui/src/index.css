@@ -11,9 +11,44 @@
 }
 
 :root {
-  /* Typography */
+  /*
+   * Typography
+   *
+   * Display: DM Serif Display — high-contrast didone-influenced serif.
+   *   Carries the "premium / instrument" tone for hero numbers without
+   *   leaning on glow effects. Used for all numeric readouts.
+   *
+   * Body: IBM Plex Sans — chosen over the more common Outfit / Inter
+   *   because it has actual character (the slightly canted lowercase
+   *   letters, the open `a`, the engineered feel) which fits a launch
+   *   monitor / measurement instrument better than the ubiquitous
+   *   geometric grotesks. Free, available in 7 weights, on Google Fonts.
+   */
   --font-display: 'DM Serif Display', Georgia, serif;
-  --font-body: 'Outfit', system-ui, -apple-system, sans-serif;
+  --font-body: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+
+  /*
+   * Type scale — modular and intentional.
+   *
+   * Numeric readouts use a 1.5x ratio (5 → 3 → 2 rem) so each tier is
+   * unambiguously different at a glance. The audit found everything
+   * was `5rem`, which made the eye scan everywhere; this scale gives
+   * the user a single hero and a single secondary on each screen.
+   *
+   * Hero is fluid via clamp() so it adapts gracefully when the UI is
+   * loaded in a dev browser; on the 800px kiosk it locks at 5rem.
+   * Other tiers are fixed because predictability matters more than
+   * fluidity at app-UI density.
+   */
+  --text-display-hero: clamp(3rem, 8vw, 5rem); /* speed gauge — the one hero */
+  --text-display-primary: 3rem;                /* answer numbers (carry) */
+  --text-display-tertiary: 2rem;               /* supporting metrics */
+  --text-display-stat-primary: 2.5rem;         /* primary cards on stats screen */
+  --text-display-stat-secondary: 2rem;         /* secondary cards on stats screen */
+
+  --text-label: 0.875rem;          /* 14px — comfortable label baseline */
+  --text-label-small: 0.75rem;     /* 12px — minimum legible label */
+  --text-caption: 0.75rem;         /* 12px — minimum supporting text */
 
   /*
    * Backgrounds — warmed from the previous near-black blue-violet to a

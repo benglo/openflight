@@ -114,10 +114,10 @@
   align-items: center;
 }
 
-/* Default: value fully visible, no animation */
+/* Hero readout — the one true primary number on this screen. */
 .speed-gauge__value {
   font-family: var(--font-display);
-  font-size: 5rem;
+  font-size: var(--text-display-hero);
   font-weight: 400;
   color: var(--color-gold);
   line-height: 1;
@@ -199,10 +199,14 @@
   gap: 4px;
 }
 
-/* Default: metric value fully visible, no animation */
+/*
+ * Tertiary readout (default). Most metric cards land here — club speed,
+ * launch angles, sim total/lateral/apex, etc. They support the hero;
+ * they don't compete with it.
+ */
 .metric-card__value {
   font-family: var(--font-display);
-  font-size: 5rem;
+  font-size: var(--text-display-tertiary);
   font-weight: 400;
   line-height: 1;
   color: var(--color-cream);
@@ -213,7 +217,13 @@
   animation: value-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both;
 }
 
+/*
+ * Primary cards (carry, sim carry) — the "answer" numbers. One step
+ * below the hero gauge, one step above the supporting metrics. Color
+ * + size + glow combine to make these read as "the result."
+ */
 .metric-card--primary .metric-card__value {
+  font-size: var(--text-display-primary);
   color: var(--color-gold);
   text-shadow: 0 0 20px var(--color-gold-glow);
 }
@@ -229,7 +239,7 @@
 }
 
 .metric-card__label {
-  font-size: 1rem;
+  font-size: var(--text-label);
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -237,8 +247,10 @@
   margin-top: 6px;
 }
 
+/* Held at the 12px legibility floor — anything smaller stops being
+   real text and becomes decoration. */
 .metric-card__subtext {
-  font-size: 0.5625rem;
+  font-size: var(--text-caption);
   color: var(--text-muted);
   margin-top: 2px;
   opacity: 0.7;
@@ -271,7 +283,7 @@
 }
 
 .metric-card__confidence-label {
-  font-size: 0.5625rem;
+  font-size: var(--text-caption);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -410,7 +422,14 @@
   }
 }
 
-/* Landscape 7" screen (800x480) */
+/*
+ * Landscape 7" screen (800x480).
+ *
+ * Numeric values shrink so the metric grid fits at high density, but
+ * label/caption text holds at 0.75rem (12px) — the legibility floor.
+ * If something doesn't fit, the right answer is to render less, not
+ * to render unreadable.
+ */
 @media (max-height: 500px) {
   .shot-display {
     padding: var(--space-xs) var(--space-sm);
@@ -431,16 +450,17 @@
     max-width: 220px;
   }
 
+  /* Hero shrinks but stays distinctly larger than primary cards. */
   .speed-gauge__value {
-    font-size: 3.5rem;
+    font-size: 3rem;
   }
 
   .speed-gauge__unit {
-    font-size: 0.875rem;
+    font-size: var(--text-label);
   }
 
   .speed-gauge__label {
-    font-size: 0.6875rem;
+    font-size: var(--text-label-small);
   }
 
   .metric-card {
@@ -448,21 +468,28 @@
     min-height: 0;
   }
 
+  /* Tertiary metrics in landscape — clearly below primary, still
+     readable in the gold-accent serif. */
   .metric-card__value {
-    font-size: 1.75rem;
+    font-size: 1.5rem;
+  }
+
+  .metric-card--primary .metric-card__value {
+    font-size: 2rem;
   }
 
   .metric-card__unit {
-    font-size: 0.8rem;
+    font-size: var(--text-label-small);
   }
 
+  /* Hold at the 12px floor in landscape too — see comment block above. */
   .metric-card__label {
-    font-size: 0.5625rem;
+    font-size: var(--text-label-small);
     margin-top: 2px;
   }
 
   .metric-card__subtext {
-    font-size: 0.5rem;
+    font-size: var(--text-caption);
     margin-top: 1px;
   }
 
@@ -477,7 +504,7 @@
   }
 
   .metric-card__confidence-label {
-    font-size: 0.5rem;
+    font-size: var(--text-caption);
   }
 
   .shot-display__waiting-text {
@@ -485,7 +512,7 @@
   }
 
   .shot-display__waiting-hint {
-    font-size: 0.75rem;
+    font-size: var(--text-caption);
   }
 
   .golf-ball-indicator {

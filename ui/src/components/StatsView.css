@@ -104,9 +104,15 @@
   border-color: rgba(212, 175, 55, 0.2);
 }
 
+/*
+ * Stat card values use the stat-tier of the type scale (smaller than
+ * the Live screen's hero/primary tiers, since stats cards are dense
+ * and there's no single "answer" — they're a uniform readout).
+ * Primary cards step up by ~25% so Avg Ball / Avg Carry catch the eye.
+ */
 .stat-card__value {
   font-family: var(--font-display);
-  font-size: 2rem;
+  font-size: var(--text-display-stat-secondary);
   font-weight: 400;
   color: var(--color-cream);
   line-height: 1;
@@ -114,12 +120,14 @@
 }
 
 .stat-card--primary .stat-card__value {
+  font-size: var(--text-display-stat-primary);
   color: var(--color-gold);
   text-shadow: 0 0 20px var(--color-gold-glow);
 }
 
+/* Held at the 12px legibility floor. */
 .stat-card__label {
-  font-size: 0.625rem;
+  font-size: var(--text-label-small);
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -174,8 +182,13 @@
     font-size: 1.5rem;
   }
 
+  .stat-card--primary .stat-card__value {
+    font-size: 1.875rem; /* keeps primary > secondary in landscape too */
+  }
+
+  /* Hold at 12px floor — see typography note in default block. */
   .stat-card__label {
-    font-size: 0.5625rem;
+    font-size: var(--text-label-small);
   }
 
   .clear-button {
