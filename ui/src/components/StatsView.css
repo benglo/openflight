@@ -156,8 +156,9 @@
   }
 
   .club-tabs__tab {
+    /* WCAG 2.5.5 minimum hit area held at 44px even in landscape. */
     padding: var(--space-xs) var(--space-sm);
-    min-height: 36px;
+    min-height: 44px;
     font-size: 0.75rem;
   }
 

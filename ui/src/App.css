@@ -358,8 +358,14 @@
   }
 
   .nav__button {
+    /*
+     * Touch target stays at 44px (WCAG 2.5.5) even on the 7" landscape
+     * kiosk — that's the primary form factor for this app, so it must
+     * meet the minimum. We compress the visual signature instead by
+     * shrinking padding + label size; the hit box stays generous.
+     */
     padding: var(--space-xs) var(--space-sm);
-    min-height: 38px;
+    min-height: 44px;
     font-size: 0.75rem;
   }
 
@@ -373,8 +379,9 @@
   }
 
   .simulate-button {
+    /* WCAG 2.5.5 minimum hit area held at 44px in landscape. */
     padding: var(--space-sm);
-    min-height: 40px;
+    min-height: 44px;
     font-size: 0.875rem;
   }
 }
