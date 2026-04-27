@@ -62,11 +62,33 @@
   justify-content: center;
 }
 
+/*
+ * Right-side metrics grid. Primary cards (carry, sim carry) break out
+ * to span the full width of the grid so the layout reads as a rhythm
+ * of "here's an answer / here's its supporting context" rather than
+ * a wall of identical tiles. Spacing is also varied: tighter inside a
+ * group, looser between primaries and the cards below them, via the
+ * margin-top rule on the row that follows a primary.
+ */
 .shot-display__metrics {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--space-sm);
+  gap: var(--space-xs) var(--space-sm);
   flex: 1.2;
+  align-content: start;
+}
+
+/* Primary metric cards span the full grid — they ARE the answer, the
+   surrounding tertiary cards are context. */
+.shot-display__metrics > .metric-card--primary {
+  grid-column: 1 / -1;
+  margin-top: var(--space-xs);
+}
+
+/* First child shouldn't have the extra top space — it's the start
+   of the section, not a divider between groups. */
+.shot-display__metrics > .metric-card--primary:first-child {
+  margin-top: 0;
 }
 
 /* Speed Gauge */
@@ -453,11 +475,12 @@
     max-width: 220px;
   }
 
-  /* Hero shrinks but stays distinctly larger than primary cards. */
-  .speed-gauge__value {
-    font-size: 3rem;
-  }
-
+  /*
+   * On the kiosk, hero stays big — the gauge is read at distance and
+   * needs to dominate. The clamp() in the default rule already lets it
+   * scale on the 800px viewport (12vw = 96px = 6rem cap), so we don't
+   * need a landscape override for the gauge value itself.
+   */
   .speed-gauge__unit {
     font-size: var(--text-label);
   }
@@ -467,18 +490,19 @@
   }
 
   .metric-card {
-    padding: 0.125rem var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
     min-height: 0;
   }
 
-  /* Tertiary metrics in landscape — clearly below primary, still
-     readable in the gold-accent serif. */
+  /* Numbers stay big enough to read at distance. The HIERARCHY (primary
+     ~1.5x larger than tertiary) is what creates the visual structure,
+     not absolute smallness. */
   .metric-card__value {
-    font-size: 1.5rem;
+    font-size: 2rem;
   }
 
   .metric-card--primary .metric-card__value {
-    font-size: 2rem;
+    font-size: 3rem;
   }
 
   .metric-card__unit {

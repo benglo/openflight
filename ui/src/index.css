@@ -40,11 +40,18 @@
    * Other tiers are fixed because predictability matters more than
    * fluidity at app-UI density.
    */
-  --text-display-hero: clamp(3rem, 8vw, 5rem); /* speed gauge — the one hero */
-  --text-display-primary: 3rem;                /* answer numbers (carry) */
-  --text-display-tertiary: 2rem;               /* supporting metrics */
-  --text-display-stat-primary: 2.5rem;         /* primary cards on stats screen */
-  --text-display-stat-secondary: 2rem;         /* secondary cards on stats screen */
+  /*
+   * Sizes calibrated for a 7-10" landscape touchscreen viewed from
+   * standing distance. Big values are the point of a launch monitor —
+   * the hero number must be readable across the room. Hierarchy is
+   * driven by the *ratio* between tiers (~1.5x), not by shrinking.
+   * On 800px-wide kiosk: hero ≈ 96px, primary ≈ 64px, tertiary ≈ 40px.
+   */
+  --text-display-hero: clamp(4rem, 12vw, 6rem);  /* speed gauge — the hero */
+  --text-display-primary: 4rem;                  /* answer numbers (carry) */
+  --text-display-tertiary: 2.5rem;               /* supporting metrics */
+  --text-display-stat-primary: 3.5rem;           /* hero stat (avg carry) */
+  --text-display-stat-secondary: 2.5rem;         /* supporting stats */
 
   --text-label: 0.875rem;          /* 14px — comfortable label baseline */
   --text-label-small: 0.75rem;     /* 12px — minimum legible label */
