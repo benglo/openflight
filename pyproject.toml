@@ -38,11 +38,14 @@ ui = [
     "python-socketio>=5.10.0",
     "eventlet>=0.35.0",
 ]
-# Camera support for launch angle detection
+# Camera support for launch angle detection (cross-platform).
+# picamera2 lives in the `camera-pi` dependency-group below — it's
+# Linux-only (its python-prctl transitive dep won't build on
+# Windows/macOS) and `dependency-groups` aren't resolved unless
+# explicitly requested via `--group camera-pi`.
 camera = [
     "opencv-python>=4.13.0.92",
     "numpy>=1.20.0",
-    "picamera2>=0.3.0; sys_platform == 'linux'",
     "inference-sdk>=0.9.0",  # Roboflow inference API
 ]
 # K-LD7 radar support
@@ -79,7 +82,25 @@ dev = [
     "pre-commit>=4.0.0",
     "pytest>=9.0.3",
     "ruff>=0.1.0",
+    # The server tests import server.py which imports flask/socketio.
+    # Mirror the `ui` extra here so `uv sync` (no flags) yields a
+    # ready-to-test environment for contributors.
+    "flask>=3.0.0",
+    "flask-socketio>=5.3.0",
+    "flask-cors>=4.0.0",
+    "python-socketio>=5.10.0",
+    "eventlet>=0.35.0",
 ]
+
+# Note on picamera2 (Pi camera capture):
+# picamera2 is intentionally NOT listed in pyproject.toml. It pulls in
+# python-prctl as a transitive dep, which only builds on Linux, and its
+# universal lockfile resolution breaks Windows / macOS development.
+# On a Raspberry Pi, install it separately after `uv sync`:
+#     uv pip install "picamera2>=0.3.0"
+# OpenFlight imports picamera2 lazily and gracefully degrades when it's
+# absent (see `server.py` PICAMERA_AVAILABLE flag), so this is safe.
+
 
 [tool.ruff]
 line-length = 100
