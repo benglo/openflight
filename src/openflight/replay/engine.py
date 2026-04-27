@@ -18,6 +18,27 @@ from .types import (
 )
 
 
+def processor_from_config(config: ProcessorConfig) -> RollingBufferProcessor:
+    """Build a RollingBufferProcessor whose tunables match the given config.
+
+    The set of fields we forward as overrides intentionally excludes
+    ``sample_rate`` (handled as the dedicated positional arg) and any
+    ProcessorConfig fields that don't map to a tunable on the processor.
+    """
+    return RollingBufferProcessor(
+        sample_rate=config.sample_rate,
+        window_size=config.window_size,
+        fft_size=config.fft_size,
+        step_size_overlap=config.step_size_overlap,
+        dc_mask_bins=config.dc_mask_bins,
+        magnitude_threshold=config.magnitude_threshold,
+        spin_bandpass_bw_hz=config.spin_bandpass_bw_hz,
+        spin_snr_high=config.spin_snr_high,
+        spin_snr_medium=config.spin_snr_medium,
+        spin_snr_min=config.spin_snr_min,
+    )
+
+
 def _to_iq(capture_entry: dict) -> IQCapture:
     return IQCapture(
         sample_time=capture_entry.get("sample_time", 0.0),

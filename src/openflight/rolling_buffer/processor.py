@@ -7,6 +7,7 @@ Based on OmniPreSense AN-027 Rolling Buffer application note.
 
 import json
 import logging
+from collections import Counter
 from typing import List, Optional, Tuple
 
 import numpy as np
@@ -85,14 +86,58 @@ class RollingBufferProcessor:
     SPIN_AUTOCORR_MIN = 0.3          # Minimum normalized correlation
     SPIN_MIN_CYCLES = 2              # Minimum seam cycles to report
 
-    def __init__(self, sample_rate: int = 30000):
+    # Whitelist of class-level constants that may be overridden per instance.
+    # Keep this in sync with the replay framework's ProcessorConfig fields
+    # so that --processor-config can drive behaviour, not just be recorded.
+    _OVERRIDABLE = frozenset(
+        {
+            "WINDOW_SIZE",
+            "FFT_SIZE",
+            "STEP_SIZE_STANDARD",
+            "STEP_SIZE_OVERLAP",
+            "DC_MASK_BINS",
+            "MAGNITUDE_THRESHOLD",
+            "MIN_PEAK_SEPARATION_BINS",
+            "MAX_PEAKS_PER_DIRECTION",
+            "SPIN_BANDPASS_BW_HZ",
+            "SPIN_BANDPASS_ORDER",
+            "SPIN_ENVELOPE_FFT_SIZE",
+            "SPIN_MIN_SEAM_HZ",
+            "SPIN_MAX_SEAM_HZ",
+            "SPIN_MIN_SAMPLES",
+            "SPIN_SNR_HIGH",
+            "SPIN_SNR_MEDIUM",
+            "SPIN_SNR_MIN",
+            "SPIN_AUTOCORR_MIN",
+            "SPIN_MIN_CYCLES",
+        }
+    )
+
+    def __init__(self, sample_rate: int = 30000, **overrides):
         """Initialize processor with pre-computed window function.
 
         Args:
             sample_rate: Sample rate in Hz (default 30000). Lower rates
                 extend the buffer duration at the cost of max detectable speed.
+            **overrides: Per-instance overrides of class-level constants. Keys
+                are lowercased constant names (e.g. ``dc_mask_bins=200``,
+                ``magnitude_threshold=5.0``). Unknown keys raise TypeError so
+                typos surface immediately rather than silently doing nothing.
+
+        Raises:
+            TypeError: If an override key does not match a known constant.
         """
         self.SAMPLE_RATE = sample_rate
+
+        for key, value in overrides.items():
+            attr = key.upper()
+            if attr not in self._OVERRIDABLE:
+                raise TypeError(
+                    f"Unknown RollingBufferProcessor override {key!r}. "
+                    f"Valid keys: {sorted(k.lower() for k in self._OVERRIDABLE)}"
+                )
+            setattr(self, attr, value)
+
         self.hanning_window = np.hanning(self.WINDOW_SIZE)
 
     def parse_capture(self, response: str) -> Optional[IQCapture]:
@@ -706,7 +751,6 @@ class RollingBufferProcessor:
         speeds = [r.speed_mph for r in outbound_readings]
 
         # Bin to 1-mph buckets, find the mode
-        from collections import Counter
         binned = Counter(round(s) for s in speeds)
 
         # The ball is the highest-speed cluster with significant repetition.

@@ -29,7 +29,11 @@ from openflight.replay.aggregate import (  # noqa: E402
     compute_batch_aggregate,
     compute_session_stats,
 )
-from openflight.replay.engine import build_batch_report, replay_session  # noqa: E402
+from openflight.replay.engine import (  # noqa: E402
+    build_batch_report,
+    processor_from_config,
+    replay_session,
+)
 from openflight.replay.loader import load_session  # noqa: E402
 from openflight.replay.types import ProcessorConfig, SessionReport  # noqa: E402
 
@@ -80,11 +84,13 @@ def main(argv: list[str] | None = None) -> int:
         merged.update(overrides)
         cfg = ProcessorConfig.from_dict(merged)
 
+    processor = processor_from_config(cfg)
+
     session_reports: list[SessionReport] = []
     per_session_stats: list[dict] = []
     for path in paths:
         pairs = load_session(path)
-        comparisons = replay_session(pairs)
+        comparisons = replay_session(pairs, processor=processor)
         stats = compute_session_stats(comparisons)
         per_session_stats.append(stats)
         session_reports.append(

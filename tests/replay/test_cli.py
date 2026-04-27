@@ -157,3 +157,43 @@ def test_cli_processor_config_override_recorded(tmp_path):
     report = json.loads(output.read_text())
     assert report["processor_config"]["dc_mask_bins"] == 200
     assert report["processor_config"]["magnitude_threshold"] == 5
+
+
+def test_cli_processor_config_override_changes_behaviour(tmp_path):
+    """An extreme magnitude_threshold should suppress all detections — proves
+    --processor-config drives the live processor, not just the fingerprint."""
+    cfg = {
+        "sample_rate": 30000,
+        "window_size": 128,
+        "fft_size": 4096,
+        "step_size_overlap": 32,
+        "dc_mask_bins": 150,
+        "magnitude_threshold": 1e9,  # impossibly high — nothing should pass
+        "spin_bandpass_bw_hz": 700,
+        "spin_snr_high": 8.0,
+        "spin_snr_medium": 5.0,
+        "spin_snr_min": 3.0,
+    }
+    cfg_path = tmp_path / "cfg.json"
+    cfg_path.write_text(json.dumps(cfg))
+    output = tmp_path / "report.json"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(CLI),
+            str(FIXTURE),
+            "--output",
+            str(output),
+            "--processor-config",
+            str(cfg_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    report = json.loads(output.read_text())
+    # With the absurd threshold, every replay should fail to detect.
+    assert report["aggregate"]["replay_detection_count"] == 0
+    # And every original shot now appears as a regression.
+    assert report["aggregate"]["regressions"] == report["aggregate"]["original_detection_count"]

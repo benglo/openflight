@@ -83,6 +83,70 @@ def test_replay_capture_accepts_processor_override():
     assert result.ball_speed_mph == pytest.approx(100.0, abs=2.0)
 
 
+def test_processor_init_accepts_override_kwargs():
+    """Overrides at __init__ become instance attributes that shadow class constants."""
+    from openflight.rolling_buffer.processor import RollingBufferProcessor
+
+    proc = RollingBufferProcessor(
+        sample_rate=30000,
+        dc_mask_bins=200,
+        magnitude_threshold=42.0,
+    )
+    assert proc.DC_MASK_BINS == 200
+    assert proc.MAGNITUDE_THRESHOLD == 42.0
+    # Untouched constant still picks up the class default.
+    assert proc.SPIN_SNR_HIGH == RollingBufferProcessor.SPIN_SNR_HIGH
+
+
+def test_processor_init_rejects_unknown_override():
+    """Typos and unknown keys raise TypeError instead of silently being ignored."""
+    from openflight.rolling_buffer.processor import RollingBufferProcessor
+
+    with pytest.raises(TypeError, match="dc_mask_bons"):
+        RollingBufferProcessor(dc_mask_bons=200)  # typo
+
+
+def test_processor_init_default_class_constants_unchanged():
+    """Overrides on one instance must not affect class-level constants."""
+    from openflight.rolling_buffer.processor import RollingBufferProcessor
+
+    original = RollingBufferProcessor.DC_MASK_BINS
+    RollingBufferProcessor(dc_mask_bins=999)
+    assert RollingBufferProcessor.DC_MASK_BINS == original
+
+
+def test_extreme_magnitude_threshold_suppresses_detection():
+    """Override with an absurd MAGNITUDE_THRESHOLD -> nothing detected.
+
+    This proves the override actually drives behaviour, not just metadata.
+    """
+    from openflight.rolling_buffer.processor import RollingBufferProcessor
+
+    proc = RollingBufferProcessor(magnitude_threshold=1e9)
+    i, q = _synth_iq(speed_mph=120.0)
+    entry = {
+        "shot_number": 1,
+        "i_samples": i,
+        "q_samples": q,
+        "sample_time": 0.0,
+        "trigger_time": 0.0,
+    }
+    result = replay_capture(entry, processor=proc)
+    assert result.detected is False
+
+
+def test_processor_from_config_applies_overrides():
+    """The replay engine helper hands ProcessorConfig fields to the processor."""
+    from openflight.replay.engine import processor_from_config
+    from openflight.replay.types import ProcessorConfig
+
+    cfg = ProcessorConfig.default()
+    cfg = ProcessorConfig.from_dict({**cfg.to_dict(), "dc_mask_bins": 250, "magnitude_threshold": 7.0})
+    proc = processor_from_config(cfg)
+    assert proc.DC_MASK_BINS == 250
+    assert proc.MAGNITUDE_THRESHOLD == 7.0
+
+
 def test_replay_session_pairs_yields_one_comparison_per_capture():
     i_a, q_a = _synth_iq(speed_mph=130.0)
     i_b, q_b = _synth_iq(speed_mph=90.0)
