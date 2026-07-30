@@ -1,0 +1,186 @@
+/* Flight Path — simulated trajectory, side and top views */
+.flight-path {
+  background: linear-gradient(145deg, var(--color-bg-card) 0%, var(--color-bg-elevated) 100%);
+  border: 1px solid rgba(212, 175, 55, 0.1);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.flight-path__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.flight-path__title {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 400;
+  margin: 0;
+  color: var(--color-gold);
+  letter-spacing: 0.02em;
+}
+
+/* Marks a path built on a club-average spin rate rather than a measured one.
+   Deliberately warning-coloured, not decorative. */
+.flight-path__badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-warning);
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 0.15rem 0.45rem;
+  cursor: help;
+}
+
+.flight-path__panel {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.flight-path__caption {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+
+.flight-path__caption-detail {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+}
+
+.flight-path__svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: var(--radius-md);
+}
+
+.flight-path__gridline {
+  stroke: rgba(245, 240, 230, 0.07);
+  stroke-width: 1;
+}
+
+.flight-path__ground {
+  stroke: rgba(245, 240, 230, 0.28);
+  stroke-width: 1.5;
+}
+
+/* Target line in the top view: dashed so it reads as a reference, not a path */
+.flight-path__target-line {
+  stroke: rgba(245, 240, 230, 0.22);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 6;
+}
+
+.flight-path__trace {
+  fill: none;
+  stroke: var(--color-gold);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 6px var(--color-gold-glow));
+}
+
+.flight-path__apex-marker {
+  fill: var(--color-cream);
+  opacity: 0.75;
+}
+
+.flight-path__landing-marker {
+  fill: var(--color-gold-bright);
+  stroke: var(--color-bg-deep);
+  stroke-width: 1.5;
+}
+
+.flight-path__tick,
+.flight-path__axis-label {
+  fill: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 11px;
+}
+
+/* Metrics strip */
+.flight-path__metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+  gap: var(--space-sm);
+  margin: 0;
+}
+
+.flight-path__metric {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm);
+  text-align: center;
+}
+
+.flight-path__metric dt {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 0.15rem;
+}
+
+.flight-path__metric dd {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.flight-path__unit {
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-left: 0.15rem;
+}
+
+.flight-path__footnote {
+  margin: 0;
+  font-size: 0.68rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  border-top: 1px solid rgba(245, 240, 230, 0.06);
+  padding-top: var(--space-sm);
+}
+
+/* Empty state */
+.flight-path--empty {
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .flight-path__metrics {
+    grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+  }
+
+  .flight-path__metric dd {
+    font-size: 1rem;
+  }
+}

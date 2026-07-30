@@ -9,6 +9,7 @@ import { socketService } from './services/socketService';
 import { ShotDisplay } from './components/ShotDisplay';
 import { StatsView } from './components/StatsView';
 import { ShotList } from './components/ShotList';
+import { FlightPath } from './components/FlightPath';
 import { DebugPanel } from './components/DebugPanel';
 import { CameraFeed } from './components/CameraFeed';
 import { ConnectionStatus } from './components/ConnectionStatus';
@@ -30,7 +31,7 @@ import Logo from './logo/Logo';
 
 import './App.css';
 
-type View = 'live' | 'stats' | 'shots' | 'camera' | 'debug';
+type View = 'live' | 'flight' | 'stats' | 'shots' | 'camera' | 'debug';
 
 // Navigation icons as inline SVGs for better control
 const Icons = {
@@ -39,6 +40,13 @@ const Icons = {
       <circle cx="12" cy="12" r="3" />
       <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
       <path d="M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+    </svg>
+  ),
+  flight: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+      <path d="M3 20c4-12 14-14 18-16" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="19" cy="5" r="2" />
+      <path d="M3 20h18" strokeLinecap="round" opacity="0.4" />
     </svg>
   ),
   stats: (
@@ -247,6 +255,13 @@ function AppContent() {
           <span>Live</span>
         </button>
         <button
+          className={`nav__button ${currentView === 'flight' ? 'nav__button--active' : ''}`}
+          onClick={() => setCurrentView('flight')}
+        >
+          {Icons.flight}
+          <span>Flight</span>
+        </button>
+        <button
           className={`nav__button ${currentView === 'stats' ? 'nav__button--active' : ''}`}
           onClick={() => setCurrentView('stats')}
         >
@@ -292,6 +307,16 @@ function AppContent() {
             )}
           </div>
         )}
+        {currentView === 'flight' &&
+          (latestShot?.trajectory ? (
+            <FlightPath key={shotVersion} trajectory={latestShot.trajectory} />
+          ) : (
+            <div className="flight-path flight-path--empty">
+              {latestShot
+                ? 'No flight path for this shot. Ball flight needs --ballistics and a measured launch angle.'
+                : 'Hit a shot to see its flight path.'}
+            </div>
+          ))}
         {currentView === 'stats' && <StatsView shots={shots} onClearSession={() => socketService.clearSession()} />}
         {currentView === 'shots' && <ShotList shots={shots} />}
         {currentView === 'camera' && (

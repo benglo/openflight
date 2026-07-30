@@ -25,6 +25,7 @@ OpenFlight is an open-source golf launch monitor that uses Doppler radar to meas
 - **Club Path**: Horizontal aim direction measured by second K-LD7 (deprecated — see below)
 - **Spin Rate**: Via rolling buffer I/Q analysis (the hardest radar measurement — see [Limitations](#limitations))
 - **Carry Distance**: Computed from ball speed, launch angle, and spin
+- **Ball Flight**: With `--ballistics`, the **Flight** tab draws the simulated trajectory — side elevation and top-down curve, with apex, side deviation, descent angle and hang time
 
 ### Hardware at a Glance
 

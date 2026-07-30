@@ -1,5 +1,36 @@
 export type SpinQuality = 'high' | 'medium' | 'low' | 'experimental';
 
+/** A single sampled point on the simulated flight path. All distances in yards. */
+export interface TrajectoryPoint {
+  /** Seconds since launch. */
+  t: number;
+  /** Downrange distance. */
+  x: number;
+  /** Lateral offset, positive right of the target line. */
+  y: number;
+  /** Height. */
+  z: number;
+}
+
+/**
+ * Simulated ball flight from the server's drag + Magnus model.
+ *
+ * Present only when ballistics is enabled (`--ballistics`) and a vertical
+ * launch angle was available; otherwise the shot carries no trajectory.
+ */
+export interface Trajectory {
+  carry_yards: number;
+  total_yards: number;
+  apex_yards: number;
+  lateral_yards: number;
+  flight_time_s: number;
+  landing_speed_mph: number;
+  landing_angle_deg: number;
+  /** Whether the path used measured spin or a club average. */
+  spin_source: 'measured' | 'club_typical' | null;
+  points: TrajectoryPoint[];
+}
+
 export interface Shot {
   ball_speed_mph: number;
   club_speed_mph: number | null;
@@ -25,6 +56,8 @@ export interface Shot {
   spin_method?: string | null;
   spin_multipath_fade_hz?: number | null;
   carry_spin_adjusted: number | null;
+  // Simulated flight path (null when ballistics is off or no launch angle)
+  trajectory: Trajectory | null;
 }
 
 export interface SessionStats {
