@@ -1,4 +1,6 @@
 import type { TrajectoryPoint } from '../types/shot';
+import type { UnitSystem } from '../utils/units';
+import { convertDistanceFromYards, convertDistanceToYards } from '../utils/units';
 
 /**
  * Pure geometry for the flight path SVGs.
@@ -60,12 +62,27 @@ export function buildPath(
     .join(' ');
 }
 
-/** Round-numbered distance gridlines that comfortably fit the range. */
-export function distanceTicks(maxYards: number): number[] {
-  const step = maxYards > 240 ? 50 : maxYards > 120 ? 25 : 10;
-  const ticks: number[] = [];
-  for (let yards = step; yards < maxYards; yards += step) {
-    ticks.push(yards);
+/** A distance gridline: where to draw it, and what to label it. */
+export interface DistanceTick {
+  /** Position along the trajectory, in yards, for the scale functions. */
+  yards: number;
+  /** Round number in the viewer's unit system, for the label. */
+  label: number;
+}
+
+/**
+ * Distance gridlines at round numbers **in the unit the viewer sees**.
+ *
+ * The step is chosen in display units and converted back to yards for
+ * positioning, so a metric viewer gets 50/100/150 m rather than the 46/91/137
+ * that falls out of picking round yards and converting the label.
+ */
+export function distanceTicks(maxYards: number, unitSystem: UnitSystem): DistanceTick[] {
+  const maxDisplay = convertDistanceFromYards(maxYards, unitSystem);
+  const step = maxDisplay > 240 ? 50 : maxDisplay > 120 ? 25 : 10;
+  const ticks: DistanceTick[] = [];
+  for (let label = step; label < maxDisplay; label += step) {
+    ticks.push({ yards: convertDistanceToYards(label, unitSystem), label });
   }
   return ticks;
 }

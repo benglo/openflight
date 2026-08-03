@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TrajectoryPoint } from '../types/shot';
+import type { UnitSystem } from '../utils/units';
 import {
   MIN_LATERAL_HALF_SPAN_YARDS,
   PADDING,
@@ -25,26 +26,58 @@ function driverFlight(): TrajectoryPoint[] {
 }
 
 describe('distanceTicks', () => {
-  it('uses 50 yard steps for long shots', () => {
-    expect(distanceTicks(280)).toEqual([50, 100, 150, 200, 250]);
+  const labels = (maxYards: number, unitSystem: UnitSystem = 'imperial') =>
+    distanceTicks(maxYards, unitSystem).map((tick) => tick.label);
+
+  it('uses 50 unit steps for long shots', () => {
+    expect(labels(280)).toEqual([50, 100, 150, 200, 250]);
   });
 
-  it('uses 25 yard steps for mid-range shots', () => {
-    expect(distanceTicks(180)).toEqual([25, 50, 75, 100, 125, 150, 175]);
+  it('uses 25 unit steps for mid-range shots', () => {
+    expect(labels(180)).toEqual([25, 50, 75, 100, 125, 150, 175]);
   });
 
-  it('uses 10 yard steps for short shots', () => {
-    expect(distanceTicks(60)).toEqual([10, 20, 30, 40, 50]);
+  it('uses 10 unit steps for short shots', () => {
+    expect(labels(60)).toEqual([10, 20, 30, 40, 50]);
   });
 
   it('never emits a tick at or beyond the maximum', () => {
     for (const max of [45, 90, 150, 300, 400]) {
-      expect(distanceTicks(max).every((tick) => tick < max)).toBe(true);
+      expect(distanceTicks(max, 'imperial').every((tick) => tick.yards < max)).toBe(true);
+      expect(distanceTicks(max, 'metric').every((tick) => tick.yards < max)).toBe(true);
     }
   });
 
   it('emits no ticks when the range is shorter than one step', () => {
-    expect(distanceTicks(8)).toEqual([]);
+    expect(labels(8)).toEqual([]);
+  });
+
+  it('labels imperial ticks in whole yards', () => {
+    expect(labels(280, 'imperial')).toEqual([50, 100, 150, 200, 250]);
+  });
+
+  // The regression this signature exists to prevent: picking round *yards* and
+  // then converting the label gave metric viewers 46, 91, 137, 183, 229.
+  // 280 yd is 256 m, so the metric axis runs one 50 m tick further out.
+  it('labels metric ticks in round metres, not converted yards', () => {
+    expect(labels(280, 'metric')).toEqual([50, 100, 150, 200, 250]);
+  });
+
+  it('positions a metric tick at its true distance in yards', () => {
+    const [first] = distanceTicks(280, 'metric');
+    expect(first.label).toBe(50);
+    // 50 m is ~54.7 yd — the label is round, the position is exact.
+    expect(first.yards).toBeCloseTo(54.68, 1);
+  });
+
+  it('renders every tick label as an integer in both systems', () => {
+    for (const unitSystem of ['imperial', 'metric'] as UnitSystem[]) {
+      for (const max of [60, 180, 280, 400]) {
+        for (const tick of distanceTicks(max, unitSystem)) {
+          expect(Number.isInteger(tick.label)).toBe(true);
+        }
+      }
+    }
   });
 });
 

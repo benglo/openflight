@@ -2456,11 +2456,16 @@ def on_shot_detected(shot: Shot):
     # be developed or demoed in --mock, the project's standard no-hardware path.
     # Carry is deliberately left untouched so mock behaviour is otherwise
     # unchanged.
+    # Guarded because this is the only simulate() call on the mock path: a
+    # failure here must not cost the shot itself, which is emitted further down.
     if shot.trajectory is None and shot.mode == "mock" and ballistics_enabled:
-        mock_conditions = resolve_launch(shot)
-        if mock_conditions is not None:
-            shot.trajectory = simulate(mock_conditions)
-            shot.trajectory_spin_source = mock_conditions.spin_source
+        try:
+            mock_conditions = resolve_launch(shot)
+            if mock_conditions is not None:
+                shot.trajectory = simulate(mock_conditions)
+                shot.trajectory_spin_source = mock_conditions.spin_source
+        except Exception as e:  # pylint: disable=broad-except
+            logger.warning("[SERVER] Mock flight simulation failed: %s", e, exc_info=True)
 
     if shot.spin_rejection_reason:
         logger.info(

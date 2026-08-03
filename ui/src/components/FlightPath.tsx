@@ -30,16 +30,23 @@ export function FlightPath({ trajectory }: FlightPathProps) {
   const { unitSystem } = useUnitPreference();
   const { points } = trajectory;
 
-  const geometry = useMemo(() => computeGeometry(points), [points]);
+  // computeGeometry throws on an empty path — a contract guard for direct
+  // callers. There is no error boundary above this component, so a throw here
+  // would white-screen the whole kiosk; fall back to the empty state instead.
+  const geometry = useMemo(() => (points.length > 0 ? computeGeometry(points) : null), [points]);
 
-  const ticks = distanceTicks(geometry.maxDistance);
   const distanceUnit = getDistanceUnit(unitSystem);
+  const ticks = distanceTicks(geometry?.maxDistance ?? 0, unitSystem);
   const lateral = trajectory.lateral_yards;
   const shapeLabel = lateral > 2 ? 'Fade' : lateral < -2 ? 'Draw' : 'Straight';
   const sideLabel = `${formatDistance(Math.abs(lateral), unitSystem)} ${distanceUnit} ${
     lateral >= 0 ? 'right' : 'left'
   }`;
   const spinAssumed = trajectory.spin_source === 'club_typical';
+
+  if (geometry === null) {
+    return <div className="flight-path flight-path--empty">No flight path for this shot.</div>;
+  }
 
   return (
     <div className="flight-path">
@@ -69,22 +76,22 @@ export function FlightPath({ trajectory }: FlightPathProps) {
             unitSystem
           )} ${distanceUnit} carry, ${formatDistance(trajectory.apex_yards, unitSystem)} ${distanceUnit} apex`}
         >
-          {ticks.map((yards) => (
-            <g key={yards}>
+          {ticks.map((tick) => (
+            <g key={tick.label}>
               <line
                 className="flight-path__gridline"
-                x1={geometry.sideScale.x(yards)}
+                x1={geometry.sideScale.x(tick.yards)}
                 y1={PADDING.top}
-                x2={geometry.sideScale.x(yards)}
+                x2={geometry.sideScale.x(tick.yards)}
                 y2={geometry.groundY}
               />
               <text
                 className="flight-path__tick"
-                x={geometry.sideScale.x(yards)}
+                x={geometry.sideScale.x(tick.yards)}
                 y={geometry.groundY + 18}
                 textAnchor="middle"
               >
-                {formatDistance(yards, unitSystem)}
+                {tick.label}
               </text>
             </g>
           ))}
@@ -132,13 +139,13 @@ export function FlightPath({ trajectory }: FlightPathProps) {
           role="img"
           aria-label={`Top view of ball flight: ${shapeLabel.toLowerCase()}, finishing ${sideLabel} of target`}
         >
-          {ticks.map((yards) => (
+          {ticks.map((tick) => (
             <line
-              key={yards}
+              key={tick.label}
               className="flight-path__gridline"
-              x1={geometry.topScale.x(yards)}
+              x1={geometry.topScale.x(tick.yards)}
               y1={PADDING.top}
-              x2={geometry.topScale.x(yards)}
+              x2={geometry.topScale.x(tick.yards)}
               y2={TOP_VIEW_HEIGHT - PADDING.bottom}
             />
           ))}

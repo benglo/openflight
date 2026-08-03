@@ -23,6 +23,20 @@ export function convertDistanceFromYards(distanceYards: number, unitSystem: Unit
   return distanceYards;
 }
 
+/**
+ * Inverse of {@link convertDistanceFromYards}: display units back to yards.
+ *
+ * Needed wherever a round number is chosen in the unit the user sees and then
+ * has to be positioned against yard-denominated data — axis ticks, for one.
+ */
+export function convertDistanceToYards(distance: number, unitSystem: UnitSystem): number {
+  if (unitSystem === 'metric') {
+    return distance / YARDS_TO_METERS;
+  }
+
+  return distance;
+}
+
 export function formatSpeed(speedMph: number, unitSystem: UnitSystem, digits = 1): string {
   return convertSpeedFromMph(speedMph, unitSystem).toFixed(digits);
 }
