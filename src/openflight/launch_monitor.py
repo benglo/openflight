@@ -8,9 +8,14 @@ RollingBufferMonitor and the Flask server.
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from .ops243 import SpeedReading
+
+if TYPE_CHECKING:  # pragma: no cover - import cycle guard
+    # ballistics imports from this module at runtime, so the reverse reference
+    # stays type-checking-only.
+    from .ballistics import Trajectory
 
 # Spin confidence threshold for "high" quality — used across modules.
 # Measured spin is trusted for physics simulation only above this level.
@@ -291,6 +296,12 @@ class Shot:
     club_angle_deg: Optional[float] = None  # Club angle of attack from K-LD7 (vertical)
     club_path_deg: Optional[float] = None  # Club path: IWR6843, or K-LD7 (deprecated, horizontal)
     spin_axis_deg: Optional[float] = None  # Spin axis tilt: 0=backspin, +right(fade), -left(draw)
+    # Simulated flight path from ballistics.simulate(), attached by the server
+    # when ballistics is enabled and launch conditions could be resolved.
+    trajectory: Optional["Trajectory"] = None
+    # "measured" or "club_typical" — whether the simulated path used the
+    # measured spin rate or a club average. Drives the UI's estimated badge.
+    trajectory_spin_source: Optional[str] = None
 
     @property
     def ball_speed_ms(self) -> float:

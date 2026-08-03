@@ -26,6 +26,7 @@ const experimentalShot: Shot = {
   spin_method: 'multitaper_ungated',
   spin_multipath_fade_hz: 48.2,
   carry_spin_adjusted: null,
+  trajectory: null,
 };
 
 describe('ShotDisplay', () => {

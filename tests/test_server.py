@@ -2554,3 +2554,112 @@ class TestOpsBaudValidation:
         a stricter check would reject a legitimate fallback to 115200, which the
         flag's own help text tells operators to use."""
         assert good in UART_BAUD_COMMANDS
+
+
+class TestTrajectorySerialization:
+    """The simulated flight path sent to the UI."""
+
+    def _shot(self, **overrides) -> Shot:
+        defaults = {
+            "ball_speed_mph": 165.0,
+            "timestamp": datetime.now(),
+            "club": ClubType.DRIVER,
+            "launch_angle_vertical": 11.0,
+            "launch_angle_horizontal": 0.0,
+            "launch_angle_confidence": 0.8,
+            "spin_rpm": 2700,
+            "spin_confidence": 0.85,
+            "spin_axis_deg": 0.0,
+            "angle_source": "radar",
+        }
+        defaults.update(overrides)
+        return Shot(**defaults)
+
+    def test_trajectory_is_null_when_none_was_simulated(self):
+        """No ballistics, no launch angle, or ballistics disabled -> no path."""
+        assert shot_to_dict(self._shot())["trajectory"] is None
+
+    def test_trajectory_to_dict_returns_none_for_no_trajectory(self):
+        assert server_module.trajectory_to_dict(None) is None
+
+    def test_serializes_a_simulated_path(self):
+        from openflight.ballistics import resolve_launch, simulate
+
+        shot = self._shot()
+        conditions = resolve_launch(shot)
+        shot.trajectory = simulate(conditions)
+        shot.trajectory_spin_source = conditions.spin_source
+
+        trajectory = shot_to_dict(shot)["trajectory"]
+
+        assert trajectory is not None
+        assert 250 < trajectory["carry_yards"] < 300
+        assert trajectory["apex_yards"] > 0
+        assert trajectory["landing_angle_deg"] > 0
+        assert trajectory["spin_source"] == "measured"
+        assert len(trajectory["points"]) > 10
+
+    def test_points_start_at_the_origin_and_end_on_the_ground(self):
+        from openflight.ballistics import resolve_launch, simulate
+
+        shot = self._shot()
+        shot.trajectory = simulate(resolve_launch(shot))
+
+        points = shot_to_dict(shot)["trajectory"]["points"]
+
+        assert points[0] == {"t": 0.0, "x": 0.0, "y": 0.0, "z": 0.0}
+        assert points[-1]["z"] == pytest.approx(0.0, abs=0.05)
+
+    def test_landing_point_matches_reported_carry(self):
+        from openflight.ballistics import resolve_launch, simulate
+
+        shot = self._shot()
+        shot.trajectory = simulate(resolve_launch(shot))
+
+        trajectory = shot_to_dict(shot)["trajectory"]
+
+        assert trajectory["points"][-1]["x"] == pytest.approx(trajectory["carry_yards"], rel=0.01)
+
+    def test_club_typical_spin_is_flagged(self):
+        """A path built on club-average spin must be distinguishable."""
+        from openflight.ballistics import resolve_launch, simulate
+
+        shot = self._shot(spin_rpm=None, spin_confidence=None)
+        conditions = resolve_launch(shot)
+        shot.trajectory = simulate(conditions)
+        shot.trajectory_spin_source = conditions.spin_source
+
+        assert shot_to_dict(shot)["trajectory"]["spin_source"] == "club_typical"
+
+    def test_fade_lands_right_and_draw_lands_left(self):
+        from openflight.ballistics import resolve_launch, simulate
+
+        fade = self._shot(spin_axis_deg=15.0)
+        fade.trajectory = simulate(resolve_launch(fade))
+        draw = self._shot(spin_axis_deg=-15.0)
+        draw.trajectory = simulate(resolve_launch(draw))
+
+        assert shot_to_dict(fade)["trajectory"]["lateral_yards"] > 0
+        assert shot_to_dict(draw)["trajectory"]["lateral_yards"] < 0
+
+    def test_payload_is_json_serializable_and_bounded(self):
+        from openflight.ballistics import resolve_launch, simulate
+
+        shot = self._shot()
+        shot.trajectory = simulate(resolve_launch(shot))
+
+        encoded = json.dumps(shot_to_dict(shot))
+
+        assert len(encoded) < 20000
+
+    def test_shot_pipeline_attaches_the_trajectory(self, monkeypatch):
+        """on_shot_detected should keep the path, not just the carry number."""
+        TestCarryComputation()._patch_environment(monkeypatch)
+        monkeypatch.setattr(server_module, "ballistics_enabled", True)
+
+        shot = self._shot()
+        on_shot_detected(shot)
+
+        assert shot.trajectory is not None
+        assert shot.trajectory_spin_source == "measured"
+        assert len(shot.trajectory.points) > 10

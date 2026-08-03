@@ -21,7 +21,7 @@ from flask import Flask, Response, send_from_directory
 from flask_cors import CORS
 from flask_socketio import SocketIO
 
-from .ballistics import resolve_launch, simulate
+from .ballistics import Trajectory, resolve_launch, simulate
 from .launch_monitor import SPIN_CONFIDENCE_HIGH, ClubType, Shot
 from .ops243 import (
     UART_BAUD_COMMANDS,
@@ -822,6 +822,48 @@ ball_speed_correction_ball_above_radar_ft = -4.0 / 12.0
 calculated_spin_enabled = False
 
 
+def trajectory_to_dict(
+    trajectory: Optional[Trajectory], spin_source: Optional[str] = None
+) -> Optional[dict]:
+    """
+    Convert a simulated Trajectory to a JSON-serializable dict for the UI.
+
+    All distances are yards, matching ``ballistics.TrajectoryPoint``. Per-point
+    speed and spin are dropped — the flight path view plots position only, and
+    a full shot payload is emitted on every shot.
+
+    Args:
+        trajectory: Simulated flight path, or None if none was produced.
+        spin_source: "measured" or "club_typical", from the resolved launch
+            conditions. Lets the UI mark a path built on an assumed spin rate.
+
+    Returns:
+        A dict of the trajectory, or None if there is no trajectory.
+    """
+    if trajectory is None:
+        return None
+
+    return {
+        "carry_yards": round(trajectory.carry_yards, 1),
+        "total_yards": round(trajectory.total_yards, 1),
+        "apex_yards": round(trajectory.apex_yards, 1),
+        "lateral_yards": round(trajectory.lateral_yards, 1),
+        "flight_time_s": round(trajectory.flight_time_s, 2),
+        "landing_speed_mph": round(trajectory.landing_speed_mph, 1),
+        "landing_angle_deg": round(trajectory.landing_angle_deg, 1),
+        "spin_source": spin_source,
+        "points": [
+            {
+                "t": round(point.t, 3),
+                "x": round(point.x, 2),
+                "y": round(point.y, 2),
+                "z": round(point.z, 2),
+            }
+            for point in trajectory.points
+        ],
+    }
+
+
 def shot_to_dict(shot: Shot) -> dict:
     """Convert Shot to JSON-serializable dict."""
     return {
@@ -894,6 +936,9 @@ def shot_to_dict(shot: Shot) -> dict:
         "carry_spin_adjusted": round(shot.carry_spin_adjusted)
         if shot.carry_spin_adjusted
         else None,
+        # Simulated flight path for the UI. None when ballistics is disabled or
+        # no launch angle was available, in which case no path is drawn.
+        "trajectory": trajectory_to_dict(shot.trajectory, shot.trajectory_spin_source),
     }
 
 
@@ -2369,6 +2414,10 @@ def on_shot_detected(shot: Shot):
         conditions = resolve_launch(shot) if ballistics_enabled else None
         if conditions is not None:
             trajectory = simulate(conditions)
+            # Keep the path, not just the carry — the UI draws it, and holding
+            # it on the Shot means it survives a session_state replay.
+            shot.trajectory = trajectory
+            shot.trajectory_spin_source = conditions.spin_source
             shot.carry_spin_adjusted = trajectory.carry_yards
             logger.info(
                 "[SERVER] Ballistic carry: %.0f yds (spin: %.0f rpm, source: %s)",
@@ -2402,6 +2451,22 @@ def on_shot_detected(shot: Shot):
                 spin_for_carry,
                 "" if shot.spin_rpm and shot.spin_rpm > 0 else " avg",
             )
+    # Mock shots skip the carry block above (they arrive with carry already set),
+    # so simulate the path separately. Without this the flight path view cannot
+    # be developed or demoed in --mock, the project's standard no-hardware path.
+    # Carry is deliberately left untouched so mock behaviour is otherwise
+    # unchanged.
+    # Guarded because this is the only simulate() call on the mock path: a
+    # failure here must not cost the shot itself, which is emitted further down.
+    if shot.trajectory is None and shot.mode == "mock" and ballistics_enabled:
+        try:
+            mock_conditions = resolve_launch(shot)
+            if mock_conditions is not None:
+                shot.trajectory = simulate(mock_conditions)
+                shot.trajectory_spin_source = mock_conditions.spin_source
+        except Exception as e:  # pylint: disable=broad-except
+            logger.warning("[SERVER] Mock flight simulation failed: %s", e, exc_info=True)
+
     if shot.spin_rejection_reason:
         logger.info(
             "[SERVER] Spin unavailable: %s (snr=%s, candidate=%s rpm)",

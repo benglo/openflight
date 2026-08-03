@@ -33,6 +33,7 @@ const shot: Shot = {
   spin_quality: 'high',
   spin_source: 'calculated',
   carry_spin_adjusted: 261,
+  trajectory: null,
 };
 
 describe('DisplayMode', () => {
